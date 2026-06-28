@@ -64,10 +64,10 @@ logger.info("✅ 路由逻辑验证通过")
 
 # ── 6. 验证 prompt 文件存在 ──
 from app.core.load_prompt import PROMPT_DIR
-for prompt_name in ["item_name_confirm", "hyde_generate"]:
+for prompt_name in ["item_name_confirm", "hyde_generate", "answer_out"]:
     prompt_path = os.path.join(PROMPT_DIR, f"{prompt_name}.prompt")
     assert os.path.exists(prompt_path), f"Prompt 文件不存在: {prompt_path}"
-logger.info("✅ Prompt 文件验证通过（item_name_confirm, hyde_generate）")
+logger.info("✅ Prompt 文件验证通过（item_name_confirm, hyde_generate, answer_out）")
 
 # ── 7. 验证节点函数签名 ──
 import inspect
@@ -84,5 +84,28 @@ for name, func in [
     params = list(sig.parameters.keys())
     assert "state" in params, f"{name} 缺少 state 参数"
 logger.info("✅ 全部节点函数签名验证通过")
+
+# ── 8. 验证 RRF 融合算法（纯逻辑，无需外部服务）──
+from app.query_process.agent.nodes.node_rrf import _rrf_fuse, _get_chunk_key
+
+embedding_chunks = [
+    {"chunk_id": "1", "content": "文档A", "source": "embedding"},
+    {"chunk_id": "2", "content": "文档B", "source": "embedding"},
+]
+hyde_chunks = [
+    {"chunk_id": "2", "content": "文档B", "source": "hyde"},
+    {"chunk_id": "3", "content": "文档C", "source": "hyde"},
+]
+web_docs = [
+    {"chunk_id": "web_1", "content": "网页A", "source": "web"},
+]
+
+fused = _rrf_fuse(embedding_chunks, hyde_chunks, web_docs)
+assert len(fused) == 4, f"RRF 融合结果数量不对: {len(fused)}"
+# chunk_id=2 出现在两路中，应该排名第一
+assert str(fused[0].get("chunk_id")) == "2", f"RRF Top1 应该是 chunk_id=2, 实际: {fused[0].get('chunk_id')}"
+assert "embedding" in fused[0].get("sources", [])
+assert "hyde" in fused[0].get("sources", [])
+logger.info(f"✅ RRF 融合算法验证通过（{len(fused)} 条融合结果）")
 
 logger.info("===== 检索图结构测试全部通过 =====")
