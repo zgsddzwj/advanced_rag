@@ -1,253 +1,247 @@
-# PDF 解析监控项目
+# 掌柜智库 — 高级 RAG 系统
 
-这是一个功能完整的 PDF 解析项目，集成了多种解析方式和全面的监控功能。
+基于 LangGraph 编排的高级检索增强生成（RAG）系统，包含完整的**文档导入**和**智能问答**两条流程，全部 AI 能力通过阿里云百炼 API 接入。
 
-## 功能特性
+## 架构概览
 
-- ✅ **多种解析方式**: 
-  - MinerU (magic-pdf) - 高质量 PDF 解析
-  - LangChain - 快速文本提取
-- 🌐 **Web 管理后台**: 在线上传、解析、查看结果
-- 📊 **性能监控**: 实时监控每个解析步骤的执行时间和内存使用情况
-- 📝 **详细日志**: 记录解析过程的详细日志，支持控制台输出和文件保存
-- 📈 **进度追踪**: 可视化显示解析进度条
-- 📋 **性能报告**: 自动生成 JSON 格式的性能报告
-- 📄 **结果展示**: 完整的文本内容和结构化信息展示
+```
+┌─────────────────────────────────────────────────────────┐
+│                    FastAPI (:8000)                       │
+│  ┌──────────────────┐    ┌──────────────────────────┐  │
+│  │   导入服务 (:8000) │    │    查询服务 (:8001)       │  │
+│  │  /api/import/*    │    │   /api/query/*           │  │
+│  └────────┬─────────┘    └───────────┬──────────────┘  │
+│           │                          │                   │
+│  ┌────────▼─────────┐    ┌───────────▼──────────────┐  │
+│  │  导入 LangGraph   │    │   检索 LangGraph          │  │
+│  │  7 节点工作流     │    │   7 节点工作流 + SSE      │  │
+│  └────────┬─────────┘    └───────────┬──────────────┘  │
+└───────────┼──────────────────────────┼──────────────────┘
+            │                          │
+  ┌─────────▼──────────────────────────▼──────────────┐
+  │              基础设施层 (Docker Compose)            │
+  │  ┌────────┐  ┌────────┐  ┌─────────┐  ┌────────┐ │
+  │  │ Milvus │  │ MinIO  │  │ MongoDB │  │  etcd  │ │
+  │  │ 向量检索 │  │ 文件存储│  │ 对话历史 │  │  服务  │ │
+  │  └────────┘  └────────┘  └─────────┘  └────────┘ │
+  └───────────────────────────────────────────────────┘
+            │                          │
+  ┌─────────▼──────────────────────────▼──────────────┐
+  │           阿里云百炼 API (DashScope)               │
+  │  LLM (Qwen-Plus) · VLM (Qwen-VL-Plus)             │
+  │  Embedding (text-embedding-v3) · Rerank (gte-rerank)│
+  │  网络搜索 (MCP)                                    │
+  └───────────────────────────────────────────────────┘
+```
+
+## 技术栈
+
+| 层级 | 技术 |
+|------|------|
+| 工作流编排 | LangGraph |
+| Web 框架 | FastAPI + SSE 流式输出 |
+| 向量数据库 | Milvus 2.4（Dense + BM25 混合检索） |
+| 文件存储 | MinIO |
+| 对话历史 | MongoDB |
+| AI 模型 | 阿里云百炼（Qwen-Plus / Qwen-VL-Plus / text-embedding-v3 / gte-rerank） |
+| PDF 解析 | MinerU (magic-pdf) |
+| 基础设施 | Docker Compose |
+| Python | 3.11+ |
 
 ## 项目结构
 
 ```
 advanced_rag/
-├── requirements.txt          # 项目依赖
-├── README.md                 # 项目说明文档
-├── app.py                    # Web 管理后台（Flask）
-├── pdf_parser.py             # MinerU 解析器
-├── langchain_parser.py       # LangChain 解析器
-├── result_viewer.py          # 结果查看器
-├── monitor.py                # 监控装饰器和工具类
-├── config.py                 # 配置管理
-├── templates/                # Web 模板
-│   ├── index.html           # 首页
-│   └── result.html          # 结果页
-├── logs/                     # 日志目录
-├── output/                   # 解析结果输出目录
-│   ├── text/                # 文本文件
-│   └── structured/          # 结构化数据
-├── uploads/                  # 上传文件目录
-└── examples/                 # 示例脚本
-    ├── parse_example.py      # MinerU 示例
-    └── langchain_parse_example.py  # LangChain 示例
+├── main.py                              # FastAPI 主应用入口
+├── docker-compose.yml                   # 基础设施编排
+├── pyproject.toml                       # 项目依赖
+├── .env.example                         # 环境变量模板
+│
+├── app/
+│   ├── core/                            # 核心工具
+│   │   ├── logger.py                    #   日志 (loguru)
+│   │   └── load_prompt.py               #   Prompt 模板加载器
+│   ├── conf/                            # 配置层
+│   │   ├── lm_config.py                 #   AI 模型配置
+│   │   ├── milvus_config.py             #   Milvus 配置
+│   │   ├── bailian_mcp_config.py        #   百炼 MCP 配置
+│   │   ├── mineru_config.py             #   MinerU 配置
+│   │   └── embedding_config.py          #   Embedding 配置
+│   ├── lm/                              # AI 模型封装层
+│   │   ├── lm_utils.py                  #   LLM (Qwen-Plus)
+│   │   ├── vlm_utils.py                 #   VLM (Qwen-VL-Plus)
+│   │   ├── embedding_utils.py           #   Embedding (text-embedding-v3)
+│   │   ├── rerank_utils.py              #   Rerank (gte-rerank)
+│   │   └── web_search_utils.py          #   网络搜索 (百炼 MCP)
+│   ├── clients/                         # 基础设施客户端
+│   │   ├── milvus_utils.py              #   Milvus 连接 + 混合搜索
+│   │   ├── minio_utils.py               #   MinIO 文件操作
+│   │   └── mongo_history_utils.py       #   MongoDB 对话历史
+│   ├── utils/                           # 通用工具
+│   │   ├── task_utils.py                #   任务状态管理
+│   │   ├── sse_utils.py                 #   SSE 事件队列
+│   │   ├── path_util.py                 #   项目路径工具
+│   │   └── escape_milvus_string_utils.py#   Milvus 字符串转义
+│   ├── import_process/                  # 导入流程
+│   │   ├── agent/
+│   │   │   ├── state.py                 #   ImportGraphState
+│   │   │   ├── main_graph.py            #   导入图编排 (7 节点)
+│   │   │   └── nodes/
+│   │   │       ├── node_entry.py        #   ① 入口：文件类型判断
+│   │   │       ├── node_pdf_to_md.py    #   ② PDF→Markdown (MinerU)
+│   │   │       ├── node_md_img.py       #   ③ 图片处理 (VLM)
+│   │   │       ├── node_document_split.py#  ④ 文档切分
+│   │   │       ├── node_item_name_recognition.py # ⑤ 商品名识别 (LLM)
+│   │   │       ├── node_bge_embedding.py#   ⑥ 向量化 (Embedding API)
+│   │   │       └── node_import_milvus.py#   ⑦ 入库 Milvus
+│   │   ├── api/file_import_service.py   #   导入 FastAPI 路由
+│   │   └── page/import.html             #   导入前端页面
+│   └── query_process/                   # 查询流程
+│       ├── agent/
+│       │   ├── state.py                 #   QueryGraphState
+│       │   ├── main_graph.py            #   检索图编排 (7 节点)
+│       │   └── nodes/
+│       │       ├── node_item_name_confirm.py    # ① 商品名确认+查询改写
+│       │       ├── node_search_embedding.py     # ② 向量+BM25混合检索
+│       │       ├── node_search_embedding_hyde.py# ③ HyDE假设性文档检索
+│       │       ├── node_web_search_mcp.py       # ④ 百炼MCP网络搜索
+│       │       ├── node_rrf.py                  # ⑤ RRF多路融合
+│       │       ├── node_rerank.py               # ⑥ gte-rerank重排
+│       │       └── node_answer_output.py        # ⑦ LLM流式回答+SSE
+│       ├── api/query_service.py         #   查询 FastAPI 路由
+│       └── page/chat.html               #   聊天前端页面
+│
+├── prompts/                             # Prompt 模板
+│   ├── item_name_recognition.prompt
+│   ├── item_name_confirm.prompt
+│   ├── hyde_generate.prompt
+│   └── answer_out.prompt
+│
+├── test/                                # 测试脚本
+│   ├── 02_import_graph_flow.py          #   导入图测试
+│   ├── 03_query_graph_flow.py           #   检索图测试
+│   └── 04_e2e_integration_test.py       #   端到端集成测试
+│
+├── examples/                            # 示例文件
+│   ├── Sample1.pdf
+│   ├── Sample2.pdf
+│   └── Sample3.pdf
+│
+├── specs/design-spec.md                 # 设计规格文档
+└── docs/superpowers/plans/              # 实现计划文档
 ```
 
-## 环境要求
+## 快速开始
 
-- Python 3.12 及以上版本
-- 已安装 MinerU 模型权重文件（首次使用需要下载）
-
-## 安装步骤
-
-### 1. 创建 Conda 环境
+### 1. 环境准备
 
 ```bash
-conda create -n mineru_env python=3.12 -y
-conda activate mineru_env
+# 克隆项目
+git clone git@github.com:zgsddzwj/advanced_rag.git
+cd advanced_rag
+
+# 创建虚拟环境
+uv venv .venv
+source .venv/bin/activate
+
+# 安装依赖
+uv pip install -r pyproject.toml
 ```
 
-### 2. 安装依赖
+### 2. 配置环境变量
 
 ```bash
-pip install -U "magic-pdf[full]" -i https://mirrors.aliyun.com/pypi/simple
-pip install -r requirements.txt
+cp .env.example .env
+# 编辑 .env，填入真实的 DASHSCOPE_API_KEY
 ```
 
-### 3. 下载模型权重
+### 3. 启动基础设施
 
-根据 MinerU 官方文档下载并配置模型权重文件。
-
-## 使用方法
-
-### 方式 1: Web 管理后台（推荐）
-
-1. **启动服务器**:
-   ```bash
-   conda activate mineru_env
-   python app.py
-   ```
-
-2. **访问后台**: 在浏览器中打开 http://127.0.0.1:8080 或 http://localhost:8080
-   
-   > 注意：macOS 系统默认会占用 5000 端口（AirPlay Receiver），所以使用 8080 端口。
-
-3. **上传并解析**: 拖拽或选择 PDF 文件，自动解析并查看结果
-
-详细说明请查看 [ADMIN_README.md](ADMIN_README.md)
-
-### 方式 2: LangChain 解析器（快速文本提取）
-
-```python
-from langchain_parser import LangChainPDFParser
-
-# 创建解析器
-parser = LangChainPDFParser(enable_monitoring=True)
-
-# 解析 PDF
-result = parser.parse_pdf("sample.pdf")
-
-# 查看结果
-print(result['text_content'])  # 完整文本
-print(result['stats'])         # 统计信息
-print(result['metadata'])      # 元数据
-```
-
-**命令行使用**:
 ```bash
-python examples/langchain_parse_example.py examples/Sample1.pdf
+docker compose up -d
 ```
 
-### 方式 3: MinerU 解析器（高质量解析）
+启动后包含 4 个服务：
+- **Milvus** — 向量数据库 (:19530)
+- **MinIO** — 文件存储 (:9000, 控制台 :9001)
+- **MongoDB** — 对话历史 (:27017)
+- **etcd** — Milvus 依赖服务 (:2379)
 
-```python
-from pdf_parser import PDFParser
+### 4. 启动应用
 
-parser = PDFParser(enable_monitoring=True)
-result = parser.parse_pdf("sample.pdf")
-```
-
-**命令行使用**:
 ```bash
-python examples/parse_example.py sample.pdf
+python main.py
 ```
 
-## 监控功能
+访问 http://localhost:8000 即可使用：
+- 导入页面：http://localhost:8000/api/import/
+- 聊天页面：http://localhost:8000/api/query/
 
-### 监控指标
+## 核心流程
 
-解析过程中会自动记录以下指标：
+### 导入流程（7 节点 LangGraph）
 
-- **执行时间**: 每个步骤的开始时间、结束时间和执行时长
-- **内存使用**: 每个步骤的内存使用量（起始值、结束值、增量）
-- **状态信息**: 每个步骤的成功/失败状态
-- **错误信息**: 如果步骤失败，会记录详细的错误信息
-
-### 日志输出
-
-- **控制台输出**: 彩色实时日志，包含进度条
-- **日志文件**: 详细的日志文件保存在 `logs/` 目录
-- **性能报告**: JSON 格式的性能报告保存在输出目录
-
-### 性能报告示例
-
-```json
-{
-  "summary": {
-    "total_duration_seconds": 12.34,
-    "initial_memory_mb": 256.50,
-    "final_memory_mb": 512.75,
-    "total_memory_increase_mb": 256.25
-  },
-  "steps": {
-    "classify": {
-      "step_name": "classify",
-      "description": "文档分类",
-      "duration": 2.10,
-      "memory_increase_mb": 64.20,
-      "status": "success"
-    },
-    ...
-  }
-}
+```
+入口判断 → PDF转Markdown → 图片处理(VLM) → 文档切分
+    → 商品名识别(LLM) → 向量化(Embedding API) → 入库Milvus
 ```
 
-## 配置选项
+1. **入口判断**：识别文件类型（PDF/MD），提取文件名
+2. **PDF转Markdown**：调用 MinerU (magic-pdf) 解析 PDF
+3. **图片处理**：扫描 Markdown 图片 → 上传 MinIO → VLM 生成描述 → 替换链接
+4. **文档切分**：基于标题层级递归切分，拼接标题路径
+5. **商品名识别**：LLM 从内容中提取商品/设备名称
+6. **向量化**：调用 text-embedding-v3 API 批量生成稠密向量
+7. **入库Milvus**：创建集合（含 BM25 Function）→ 批量插入
 
-可以通过修改 `config.py` 或设置环境变量来配置：
+### 查询流程（7 节点 LangGraph + SSE）
 
-```python
-# config.py
-LOG_LEVEL = "INFO"                    # 日志级别
-ENABLE_PROGRESS_BAR = True            # 是否显示进度条
-ENABLE_PERFORMANCE_MONITORING = True  # 是否启用性能监控
-DROP_MODE = "none"                    # 丢弃模式
+```
+商品名确认 → 向量检索 → HyDE检索 → (网络搜索?) → RRF融合 → Rerank重排 → 流式回答
 ```
 
-## 解析步骤说明
+1. **商品名确认**：加载历史 → LLM 改写查询+提取商品名 → Milvus 向量对齐
+2. **向量检索**：Dense + BM25 混合检索（支持商品名过滤）
+3. **HyDE检索**：LLM 生成假设性回答 → 向量化 → 混合检索
+4. **网络搜索**：结果不足时调用百炼 MCP 联网搜索
+5. **RRF融合**：三路结果 Reciprocal Rank Fusion 融合排序
+6. **Rerank重排**：gte-rerank API 精准重排序 + 动态截断
+7. **回答输出**：LLM 流式生成 → SSE 推送 → 图片提取 → MongoDB 写入
 
-MinerU 解析流程包含以下步骤：
+## API 接口
 
-1. **文档分类 (classify)**: 识别 PDF 文档类型
-2. **布局分析 (analyze)**: 分析文档布局结构
-3. **内容解析 (parse)**: 提取文本、图片、表格等内容
-4. **生成 Markdown (markdown)**: 将解析结果转换为 Markdown 格式
+### 导入服务
 
-每个步骤都会被监控，记录详细的性能指标。
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/import/` | 导入页面 |
+| POST | `/api/import/upload` | 上传文件并触发导入 |
+| GET | `/api/import/status/{task_id}` | 查询导入状态 |
 
-## 注意事项
+### 查询服务
 
-1. **模型权重**: 首次使用需要下载 MinerU 模型权重文件，请参考官方文档
-2. **内存使用**: 解析大文件时可能占用较多内存，建议根据实际情况调整
-3. **日志文件**: 日志文件会自动保存在 `logs/` 目录，建议定期清理
-4. **输出目录**: 解析结果和性能报告会保存在指定的输出目录
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/query/` | 聊天页面 |
+| POST | `/api/query/ask` | 提交查询 |
+| GET | `/api/query/stream/{task_id}` | SSE 流式回答 |
+| GET | `/api/query/history/{session_id}` | 获取对话历史 |
+| DELETE | `/api/query/history/{session_id}` | 清空对话历史 |
+| GET | `/api/query/health` | 健康检查 |
 
-## 故障排除
+## 测试
 
-### 常见问题
-
-1. **导入错误**: 确保已正确安装 `magic-pdf` 和相关依赖
-2. **模型缺失**: 检查是否已下载模型权重文件
-3. **内存不足**: 尝试解析较小的文件或增加系统内存
-4. **编码错误**: 确保 PDF 文件格式正确
-
-### 查看日志和解析结果
-
-**查看解析过程监控日志**:
 ```bash
-# 使用便捷脚本
-bash view_parse_process.sh
+# 导入图结构测试
+python test/02_import_graph_flow.py
 
-# 或手动查看
-cat logs/pdf_parser_*.log
+# 检索图结构测试（含 RRF 算法验证）
+python test/03_query_graph_flow.py
+
+# 端到端集成测试（10 项验证）
+python test/04_e2e_integration_test.py
 ```
-
-**查看解析的文本内容**:
-```bash
-# 完整文本文件
-cat output/text/Sample1.txt
-
-# 特定页面
-cat output/text/Sample1_pages/page_001.txt
-
-# 结构化信息
-cat output/structured/Sample1_info.json | python -m json.tool
-```
-
-## 开发
-
-### 项目依赖
-
-- `magic-pdf[full]`: MinerU PDF 解析库
-- `psutil`: 系统资源监控
-- `tqdm`: 进度条显示
-- `colorama`: 控制台彩色输出
-
-### 扩展功能
-
-可以基于现有框架扩展以下功能：
-
-- 批量处理多个 PDF 文件
-- 自定义解析后处理逻辑
-- 集成其他 PDF 解析工具
-- Web API 接口
 
 ## 许可证
 
-本项目使用 MIT 许可证。
-
-## 参考资源
-
-- [MinerU 官方文档](https://mineru.site)
-- [magic-pdf GitHub](https://github.com/opendatalab/MinerU)
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
+MIT License

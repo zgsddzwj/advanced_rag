@@ -22,20 +22,19 @@ wheels/
 .installed.cfg
 *.egg
 
+# 虚拟环境
+.venv/
+
+# 环境变量（含 API Key，禁止提交）
+.env
+
 # 日志文件
 logs/
 *.log
 
-# 输出文件
+# 运行时输出
 output/
 uploads/
-
-# Markdown (保留 docs 和 specs)
-*.md
-!README.md
-!docs/**/*.md
-!specs/**/*.md
-!prompts/**/*.md
 
 # IDE
 .vscode/
@@ -50,24 +49,5 @@ uploads/
 .DS_Store
 Thumbs.db
 
-# 虚拟环境
-.venv/
-
-# 环境变量
-.env
-
-# Superpowers brainstorm
+# Superpowers / CatPaw
 .superpowers/
-
-# CatPaw / Claude
-.claude/
-.catpaw/
-
-# 旧文件（可选保留）
-# app.py
-# config.py
-# monitor.py
-# result_viewer.py
-# langchain_parser.py
-# pdf_parser.py
-
