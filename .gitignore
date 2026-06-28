@@ -28,8 +28,14 @@ logs/
 
 # 输出文件
 output/
+uploads/
+
+# Markdown (保留 docs 和 specs)
 *.md
 !README.md
+!docs/**/*.md
+!specs/**/*.md
+!prompts/**/*.md
 
 # IDE
 .vscode/
@@ -41,6 +47,12 @@ output/
 # OS
 .DS_Store
 Thumbs.db
+
+# 虚拟环境
+.venv/
+
+# 环境变量
+.env
 
 # Superpowers brainstorm
 .superpowers/
