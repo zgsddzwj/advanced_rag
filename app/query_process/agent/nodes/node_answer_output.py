@@ -41,6 +41,7 @@ def node_answer_output(state: QueryGraphState) -> QueryGraphState:
         history = state.get("history", [])
         item_names = state.get("item_names", [])
         session_id = state.get("session_id", "")
+        task_id = state.get("task_id", "")
 
         # Step 1: 构建上下文
         context = _build_context(reranked_docs)
@@ -51,7 +52,7 @@ def node_answer_output(state: QueryGraphState) -> QueryGraphState:
 
         # Step 3: LLM 生成回答
         if is_stream:
-            answer = _stream_generate(state, prompt, session_id)
+            answer = _stream_generate(prompt, task_id)
         else:
             answer = _invoke_generate(prompt)
 
@@ -61,12 +62,12 @@ def node_answer_output(state: QueryGraphState) -> QueryGraphState:
         image_urls = _extract_image_urls(answer)
         state["image_urls"] = image_urls
 
-        # Step 5: 助手消息写入 MongoDB
+        # Step 5: 助手消息写入 MongoDB（使用 session_id）
         _save_assistant_message(state, answer, image_urls)
 
-        # Step 6: SSE final 事件
-        if is_stream and session_id:
-            push_to_session(session_id, SSEEvent.FINAL, {
+        # Step 6: SSE final 事件（使用 task_id，与队列创建时的 key 一致）
+        if is_stream and task_id:
+            push_to_session(task_id, SSEEvent.FINAL, {
                 "answer": answer,
                 "image_urls": image_urls,
                 "item_names": item_names,
@@ -79,9 +80,9 @@ def node_answer_output(state: QueryGraphState) -> QueryGraphState:
         state["answer"] = "抱歉，生成回答时出现错误，请稍后重试。"
         state["image_urls"] = []
         if is_stream:
-            session_id = state.get("session_id", "")
-            if session_id:
-                push_to_session(session_id, SSEEvent.ERROR, {
+            task_id = state.get("task_id", "")
+            if task_id:
+                push_to_session(task_id, SSEEvent.ERROR, {
                     "message": str(e),
                 })
     finally:
@@ -145,10 +146,8 @@ def _format_history(history: List[Dict[str, Any]]) -> str:
     return "\n".join(lines) if lines else "（无历史对话）"
 
 
-def _stream_generate(
-    state: QueryGraphState, prompt: str, session_id: str
-) -> str:
-    """流式生成回答，逐 token 推送 SSE"""
+def _stream_generate(prompt: str, task_id: str) -> str:
+    """流式生成回答，逐 token 推送 SSE（使用 task_id 作为 SSE 队列 key）"""
     llm = get_llm_client()
     messages = [
         SystemMessage(content="你是一个智能助手，请根据参考内容准确回答用户问题。"),
@@ -160,9 +159,9 @@ def _stream_generate(
         token = getattr(chunk, "content", "")
         if token:
             full_answer.append(token)
-            # 推送 delta 事件
-            if session_id:
-                push_to_session(session_id, SSEEvent.DELTA, {"text": token})
+            # 推送 delta 事件（task_id 与 SSE 队列创建时的 key 一致）
+            if task_id:
+                push_to_session(task_id, SSEEvent.DELTA, {"text": token})
 
     return "".join(full_answer)
 

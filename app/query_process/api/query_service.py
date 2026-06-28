@@ -2,18 +2,15 @@
 查询服务 FastAPI 路由
 提供智能问答的 REST API，支持 SSE 流式输出
 """
-import os
 import uuid
-import asyncio
 import threading
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
 from app.core.logger import logger
-from app.utils.path_util import PROJECT_ROOT
 from app.utils.sse_utils import create_sse_queue, sse_generator, push_to_session, SSEEvent
 from app.utils.task_utils import update_task_status, get_task_status, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
 from app.query_process.agent.main_graph import kb_query_app
@@ -42,7 +39,7 @@ async def chat_page():
 async def ask(req: QueryRequest):
     """
     提交查询，返回 session_id 和 task_id
-    前端通过 /query/stream/{session_id} 接收 SSE 流式回答
+    前端通过 /query/stream/{task_id} 接收 SSE 流式回答
     """
     session_id = req.session_id or str(uuid.uuid4())[:8]
     task_id = str(uuid.uuid4())[:8]
