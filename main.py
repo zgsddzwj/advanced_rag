@@ -9,6 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from app.core.logger import logger
 from app.import_process.api.file_import_service import router as import_router
+from app.query_process.api.query_service import router as query_router
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ app = FastAPI(title="Advanced RAG", lifespan=lifespan)
 
 # 注册路由
 app.include_router(import_router, prefix="/api")
+app.include_router(query_router, prefix="/api")
 
 
 @app.get("/")
