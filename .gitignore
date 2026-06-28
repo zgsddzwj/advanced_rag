@@ -40,6 +40,8 @@ uploads/
 # IDE
 .vscode/
 .idea/
+.claude/
+.catpaw/
 *.swp
 *.swo
 *~
@@ -56,4 +58,16 @@ Thumbs.db
 
 # Superpowers brainstorm
 .superpowers/
+
+# CatPaw / Claude
+.claude/
+.catpaw/
+
+# 旧文件（可选保留）
+# app.py
+# config.py
+# monitor.py
+# result_viewer.py
+# langchain_parser.py
+# pdf_parser.py
 
