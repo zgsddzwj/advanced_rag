@@ -7,16 +7,16 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    FastAPI (:8000)                       │
-│  ┌──────────────────┐    ┌──────────────────────────┐  │
-│  │   导入服务 (:8000) │    │    查询服务 (:8001)       │  │
-│  │  /api/import/*    │    │   /api/query/*           │  │
-│  └────────┬─────────┘    └───────────┬──────────────┘  │
-│           │                          │                   │
-│  ┌────────▼─────────┐    ┌───────────▼──────────────┐  │
-│  │  导入 LangGraph   │    │   检索 LangGraph          │  │
-│  │  7 节点工作流     │    │   7 节点工作流 + SSE      │  │
-│  └────────┬─────────┘    └───────────┬──────────────┘  │
-└───────────┼──────────────────────────┼──────────────────┘
+│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
+│  │  前端服务    │  │  导入 API     │  │   查询 API     │  │
+│  │  / /import  │  │ /api/import/* │  │  /api/query/*  │  │
+│  │  /chat      │  │               │  │  + SSE 流式    │  │
+│  └─────────────┘  └───────┬──────┘  └───────┬───────┘  │
+│                           │                 │            │
+│  ┌────────────────────────▼─────────────────▼────────┐  │
+│  │         导入 LangGraph (7节点) / 检索 LangGraph     │  │
+│  └───────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────┘
             │                          │
   ┌─────────▼──────────────────────────▼──────────────┐
   │              基础设施层 (Docker Compose)            │
@@ -38,6 +38,7 @@
 
 | 层级 | 技术 |
 |------|------|
+| 前端 | 原生 HTML/CSS/JS，侧边栏布局 + SSE 流式接收 |
 | 工作流编排 | LangGraph |
 | Web 框架 | FastAPI + SSE 流式输出 |
 | 向量数据库 | Milvus 2.4（Dense + BM25 混合检索） |
@@ -52,10 +53,22 @@
 
 ```
 advanced_rag/
-├── main.py                              # FastAPI 主应用入口
+├── main.py                              # FastAPI 主应用入口（前端 + API）
 ├── docker-compose.yml                   # 基础设施编排
 ├── pyproject.toml                       # 项目依赖
 ├── .env.example                         # 环境变量模板
+│
+├── frontend/                            # ═══ 前端服务 ═══
+│   ├── index.html                       #   系统首页 (Dashboard)
+│   ├── import.html                      #   知识库导入页面
+│   ├── chat.html                        #   智能问答页面
+│   ├── css/common.css                   #   公共样式 (侧边栏/卡片/按钮)
+│   └── js/
+│       ├── config.js                    #   API 端点 + 导入节点配置
+│       ├── api.js                       #   API 封装层
+│       ├── index.js                     #   首页逻辑 (健康检查)
+│       ├── import.js                    #   导入逻辑 (上传+轮询)
+│       └── chat.js                      #   问答逻辑 (SSE 流式)
 │
 ├── app/
 │   ├── core/                            # 核心工具
@@ -94,8 +107,7 @@ advanced_rag/
 │   │   │       ├── node_item_name_recognition.py # ⑤ 商品名识别 (LLM)
 │   │   │       ├── node_bge_embedding.py#   ⑥ 向量化 (Embedding API)
 │   │   │       └── node_import_milvus.py#   ⑦ 入库 Milvus
-│   │   ├── api/file_import_service.py   #   导入 FastAPI 路由
-│   │   └── page/import.html             #   导入前端页面
+│   │   └── api/file_import_service.py   #   导入 FastAPI 路由
 │   └── query_process/                   # 查询流程
 │       ├── agent/
 │       │   ├── state.py                 #   QueryGraphState
@@ -108,8 +120,7 @@ advanced_rag/
 │       │       ├── node_rrf.py                  # ⑤ RRF多路融合
 │       │       ├── node_rerank.py               # ⑥ gte-rerank重排
 │       │       └── node_answer_output.py        # ⑦ LLM流式回答+SSE
-│       ├── api/query_service.py         #   查询 FastAPI 路由
-│       └── page/chat.html               #   聊天前端页面
+│       └── api/query_service.py         #   查询 FastAPI 路由
 │
 ├── prompts/                             # Prompt 模板
 │   ├── item_name_recognition.prompt
@@ -174,8 +185,9 @@ python main.py
 ```
 
 访问 http://localhost:8000 即可使用：
-- 导入页面：http://localhost:8000/api/import/
-- 聊天页面：http://localhost:8000/api/query/
+- 系统首页：http://localhost:8000/
+- 导入页面：http://localhost:8000/import
+- 聊天页面：http://localhost:8000/chat
 
 ## 核心流程
 
@@ -210,19 +222,26 @@ python main.py
 
 ## API 接口
 
-### 导入服务
+### 前端页面
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 系统首页 (Dashboard) |
+| `/import` | 知识库导入页面 |
+| `/chat` | 智能问答页面 |
+| `/static/*` | 静态资源 (CSS/JS) |
+
+### 导入 API
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/import/` | 导入页面 |
 | POST | `/api/import/upload` | 上传文件并触发导入 |
 | GET | `/api/import/status/{task_id}` | 查询导入状态 |
 
-### 查询服务
+### 查询 API
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/query/` | 聊天页面 |
 | POST | `/api/query/ask` | 提交查询 |
 | GET | `/api/query/stream/{task_id}` | SSE 流式回答 |
 | GET | `/api/query/history/{session_id}` | 获取对话历史 |

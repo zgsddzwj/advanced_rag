@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识库导入 - 掌柜智库</title>
+    <link rel="stylesheet" href="/static/css/common.css">
+    <style>
+        .upload-zone {
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            padding: 48px 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fafbfc;
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary);
+            background: #f0f4ff;
+        }
+        .upload-zone .upload-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .upload-zone .upload-text { font-size: 15px; color: var(--text); font-weight: 500; }
+        .upload-zone .upload-hint { font-size: 13px; color: var(--text-light); margin-top: 6px; }
+
+        .file-card {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 16px 20px;
+            background: #f8f9ff;
+            border: 1px solid #dbe4ff;
+            border-radius: var(--radius-sm);
+            margin-top: 16px;
+        }
+        .file-card .file-icon { font-size: 28px; }
+        .file-card .file-info { flex: 1; }
+        .file-card .file-name { font-size: 14px; font-weight: 500; }
+        .file-card .file-size { font-size: 12px; color: var(--text-light); }
+        .file-card .file-remove {
+            color: var(--text-light);
+            cursor: pointer;
+            font-size: 18px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .file-card .file-remove:hover { color: var(--error); background: #fee2e2; }
+
+        .actions-bar {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        /* 导入进度 */
+        .import-progress { margin-top: 24px; display: none; }
+        .import-progress.show { display: block; }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .progress-header h3 { font-size: 16px; }
+        .progress-header .progress-percent { font-size: 14px; font-weight: 600; color: var(--primary); }
+
+        .node-list { display: flex; flex-direction: column; gap: 2px; }
+        .node-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: var(--radius-sm);
+            transition: background 0.2s;
+        }
+        .node-item.running { background: #fffbeb; }
+        .node-item.done { background: #f0fdf4; }
+        .node-item.failed { background: #fef2f2; }
+
+        .node-item .node-icon {
+            width: 36px; height: 36px;
+            border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            background: var(--border);
+            flex-shrink: 0;
+        }
+        .node-item.pending .node-icon { opacity: 0.4; }
+        .node-item.running .node-icon { background: #fef3c7; }
+        .node-item.done .node-icon { background: #d1fae5; }
+        .node-item.failed .node-icon { background: #fee2e2; }
+
+        .node-item .node-content { flex: 1; }
+        .node-item .node-label { font-size: 14px; font-weight: 500; }
+        .node-item .node-id { font-size: 12px; color: var(--text-light); font-family: monospace; }
+
+        .node-item .node-status {
+            font-size: 13px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .node-status.pending { color: var(--text-light); }
+        .node-status.running { color: var(--warning); }
+        .node-status.done { color: var(--success); }
+        .node-status.failed { color: var(--error); }
+
+        .result-banner {
+            margin-top: 20px;
+            padding: 16px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            display: none;
+        }
+        .result-banner.show { display: block; }
+        .result-banner.success { background: #d1fae5; color: #065f46; }
+        .result-banner.error { background: #fee2e2; color: #991b1b; }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon">📚</div>
+                <span>掌柜智库</span>
+            </div>
+            <div class="subtitle">Advanced RAG System</div>
+        </div>
+        <nav class="sidebar-nav">
+            <a href="/" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span>系统首页</span>
+            </a>
+            <a href="/import" class="nav-item active">
+                <span class="nav-icon">📥</span>
+                <span>知识库导入</span>
+            </a>
+            <a href="/chat" class="nav-item">
+                <span class="nav-icon">💬</span>
+                <span>智能问答</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <span class="status-dot"></span>
+            <span>服务运行中</span>
+        </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <div class="main">
+        <div class="topbar">
+            <h2>📥 知识库导入</h2>
+        </div>
+        <div class="content">
+            <div class="card">
+                <div class="card-title">上传文档</div>
+
+                <!-- 上传区域 -->
+                <div class="upload-zone" id="uploadZone">
+                    <div class="upload-icon">📄</div>
+                    <div class="upload-text">点击或拖拽文件到此处上传</div>
+                    <div class="upload-hint">支持 PDF / Markdown 格式</div>
+                </div>
+                <input type="file" id="fileInput" accept=".pdf,.md" style="display:none;">
+
+                <!-- 已选文件 -->
+                <div id="fileCardContainer"></div>
+
+                <!-- 操作按钮 -->
+                <div class="actions-bar">
+                    <button class="btn btn-primary" id="uploadBtn" onclick="startImport()" disabled>
+                        🚀 开始导入
+                    </button>
+                    <button class="btn btn-ghost" id="resetBtn" onclick="resetAll()" style="display:none;">
+                        重新导入
+                    </button>
+                </div>
+            </div>
+
+            <!-- 导入进度 -->
+            <div class="import-progress" id="importProgress">
+                <div class="card">
+                    <div class="progress-header">
+                        <h3>导入进度</h3>
+                        <span class="progress-percent" id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar" style="margin-bottom: 20px;">
+                        <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+                    </div>
+                    <div class="node-list" id="nodeList"></div>
+                    <div class="result-banner" id="resultBanner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/config.js"></script>
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/import.js"></script>
+</body>
+</html>

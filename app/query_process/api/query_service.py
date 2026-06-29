@@ -4,10 +4,9 @@
 """
 import uuid
 import threading
-from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.core.logger import logger
@@ -24,15 +23,6 @@ class QueryRequest(BaseModel):
     """查询请求"""
     query: str
     session_id: str = ""
-
-
-@router.get("/", response_class=HTMLResponse)
-async def chat_page():
-    """聊天页面"""
-    html_path = Path(__file__).parent.parent / "page" / "chat.html"
-    if html_path.exists():
-        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>chat.html not found</h1>")
 
 
 @router.post("/ask")

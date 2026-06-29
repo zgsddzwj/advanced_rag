@@ -4,11 +4,9 @@
 """
 import os
 import uuid
-import asyncio
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks
-from fastapi.responses import HTMLResponse
 
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
@@ -20,15 +18,6 @@ router = APIRouter(prefix="/import", tags=["import"])
 
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 OUTPUT_DIR = PROJECT_ROOT / "output"
-
-
-@router.get("/", response_class=HTMLResponse)
-async def import_page():
-    """导入页面"""
-    html_path = Path(__file__).parent.parent / "page" / "import.html"
-    if html_path.exists():
-        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
-    return HTMLResponse(content="<h1>import.html not found</h1>")
 
 
 @router.post("/upload")

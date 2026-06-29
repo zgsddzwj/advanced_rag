@@ -130,19 +130,25 @@ for route in app.routes:
         route_paths.append(path)
 
 # 验证关键端点存在（通过 HTTP 状态码判断路由是否注册）
-# /api/import/ 应返回 200（HTML 页面）
-r1 = client.get("/api/import/")
-# /api/query/ 应返回 200（HTML 页面）
-r2 = client.get("/api/query/")
+# / 应返回 200（前端首页）
+r0 = client.get("/")
+# /import 应返回 200（前端导入页面）
+r1 = client.get("/import")
+# /chat 应返回 200（前端问答页面）
+r2 = client.get("/chat")
+# /static/css/common.css 应返回 200（静态资源）
+r_static = client.get("/static/css/common.css")
 # /api/query/health 应返回 200
 r3 = client.get("/api/query/health")
 
+assert r0.status_code == 200, f"前端首页不可达: {r0.status_code}"
 assert r1.status_code == 200, f"导入页面不可达: {r1.status_code}"
-assert r2.status_code == 200, f"查询页面不可达: {r2.status_code}"
+assert r2.status_code == 200, f"问答页面不可达: {r2.status_code}"
+assert r_static.status_code == 200, f"静态资源不可达: {r_static.status_code}"
 assert r3.status_code == 200, f"健康检查不可达: {r3.status_code}"
 assert r3.json()["status"] == "ok", f"健康检查返回异常: {r3.json()}"
 
-logger.info(f"✅ FastAPI 路由验证通过（导入页面 + 查询页面 + 健康检查均可达）")
+logger.info(f"✅ FastAPI 路由验证通过（前端页面 + 静态资源 + 健康检查均可达）")
 
 # ════════════════════════════════════════
 # 8. Prompt 文件完整性验证
@@ -209,7 +215,7 @@ logger.info("  ✅ AI 模型封装 (LLM/VLM/Embedding/Rerank/WebSearch)")
 logger.info("  ✅ 基础设施客户端 (Milvus/MinIO/MongoDB)")
 logger.info("  ✅ 导入流程 (7节点 LangGraph + FastAPI)")
 logger.info("  ✅ 检索流程 (7节点 LangGraph + SSE FastAPI)")
-logger.info("  ✅ FastAPI 主应用 (导入+查询双服务)")
+logger.info("  ✅ FastAPI 主应用 (前端服务 + 导入+查询双API)")
 logger.info("  ✅ Prompt 文件完整性")
 logger.info("  ✅ 数据流连通性")
 logger.info("════════════════════════════════════════")
