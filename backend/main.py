@@ -5,16 +5,16 @@ FastAPI 主应用入口
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.logger import logger
 from app.import_process.api.file_import_service import router as import_router
 from app.query_process.api.query_service import router as query_router
 
-# 前端静态文件目录（位于项目根目录的 frontend/）
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+# 前端构建产物目录（frontend/dist/）
+FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
@@ -26,32 +26,33 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Advanced RAG", lifespan=lifespan)
 
-# 挂载前端静态资源 (CSS/JS)
-app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
-
 # 注册后端 API 路由
 app.include_router(import_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 
+# 挂载前端静态资源 (CSS/JS/assets)
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
 
-# ==================== 前端页面路由 ====================
+
+# ==================== 前端页面路由 (SPA) ====================
 
 @app.get("/")
 async def index():
     """首页"""
-    return FileResponse(str(FRONTEND_DIR / "index.html"))
+    return FileResponse(str(FRONTEND_DIST / "index.html"))
 
 
 @app.get("/import")
 async def import_page():
-    """知识库导入页面"""
-    return FileResponse(str(FRONTEND_DIR / "import.html"))
+    """知识库导入页面 — SPA 路由回退"""
+    return FileResponse(str(FRONTEND_DIST / "index.html"))
 
 
 @app.get("/chat")
 async def chat_page():
-    """智能问答页面"""
-    return FileResponse(str(FRONTEND_DIR / "chat.html"))
+    """智能问答页面 — SPA 路由回退"""
+    return FileResponse(str(FRONTEND_DIST / "index.html"))
 
 
 if __name__ == "__main__":

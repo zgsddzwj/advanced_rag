@@ -130,25 +130,22 @@ for route in app.routes:
         route_paths.append(path)
 
 # 验证关键端点存在（通过 HTTP 状态码判断路由是否注册）
-# / 应返回 200（前端首页）
+# / 应返回 200（前端首页 index.html）
 r0 = client.get("/")
-# /import 应返回 200（前端导入页面）
+# /import 应返回 200（SPA 路由回退）
 r1 = client.get("/import")
-# /chat 应返回 200（前端问答页面）
+# /chat 应返回 200（SPA 路由回退）
 r2 = client.get("/chat")
-# /static/css/common.css 应返回 200（静态资源）
-r_static = client.get("/static/css/common.css")
 # /api/query/health 应返回 200
 r3 = client.get("/api/query/health")
 
 assert r0.status_code == 200, f"前端首页不可达: {r0.status_code}"
 assert r1.status_code == 200, f"导入页面不可达: {r1.status_code}"
 assert r2.status_code == 200, f"问答页面不可达: {r2.status_code}"
-assert r_static.status_code == 200, f"静态资源不可达: {r_static.status_code}"
 assert r3.status_code == 200, f"健康检查不可达: {r3.status_code}"
 assert r3.json()["status"] == "ok", f"健康检查返回异常: {r3.json()}"
 
-logger.info(f"✅ FastAPI 路由验证通过（前端页面 + 静态资源 + 健康检查均可达）")
+logger.info(f"✅ FastAPI 路由验证通过（前端页面 + API 健康检查均可达）")
 
 # ════════════════════════════════════════
 # 8. Prompt 文件完整性验证

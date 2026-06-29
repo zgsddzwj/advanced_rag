@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f0f2f5;
+}
+
+/* highlight.js 代码高亮主题 */
+.hljs {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  border-radius: 8px;
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hljs-keyword { color: #cba6f7; }
+.hljs-string { color: #a6e3a1; }
+.hljs-number { color: #fab387; }
+.hljs-comment { color: #6c7086; font-style: italic; }
+.hljs-function { color: #89b4fa; }
+.hljs-title { color: #89b4fa; }
+.hljs-params { color: #f2cdcd; }
+.hljs-built_in { color: #f9e2af; }
+.hljs-attr { color: #f9e2af; }
+.hljs-tag { color: #f38ba8; }
+.hljs-name { color: #f38ba8; }
+
+/* Markdown 渲染样式 */
+.markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.75rem; }
+.markdown-body h2 { font-size: 1.3rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+.markdown-body h3 { font-size: 1.15rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
+.markdown-body p { margin: 0.5rem 0; line-height: 1.75; }
+.markdown-body ul, .markdown-body ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+.markdown-body li { margin: 0.25rem 0; line-height: 1.7; }
+.markdown-body code {
+  background: #f3f4f6;
+  color: #dc2626;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.875em;
+  font-family: 'Fira Code', 'Consolas', monospace;
+}
+.markdown-body pre {
+  margin: 0.75rem 0;
+}
+.markdown-body pre code {
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+.markdown-body blockquote {
+  border-left: 4px solid #d1d5db;
+  padding-left: 1rem;
+  margin: 0.75rem 0;
+  color: #6b7280;
+}
+.markdown-body table {
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  width: 100%;
+}
+.markdown-body th, .markdown-body td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 12px;
+  text-align: left;
+}
+.markdown-body th { background: #f9fafb; font-weight: 600; }
+.markdown-body img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
+.markdown-body a { color: #6366f1; text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+
+/* 滚动条 */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }

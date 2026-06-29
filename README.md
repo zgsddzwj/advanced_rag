@@ -7,22 +7,21 @@
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    FastAPI (:8000)                       │
-│  ┌─────────────┐  ┌──────────────┐  ┌───────────────┐  │
-│  │  前端服务    │  │  导入 API     │  │   查询 API     │  │
-│  │  / /import  │  │ /api/import/* │  │  /api/query/*  │  │
-│  │  /chat      │  │               │  │  + SSE 流式    │  │
-│  └─────────────┘  └───────┬──────┘  └───────┬───────┘  │
-│                           │                 │            │
-│  ┌────────────────────────▼─────────────────▼────────┐  │
-│  │         导入 LangGraph (7节点) / 检索 LangGraph     │  │
-│  └───────────────────────────────────────────────────┘  │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
+│  │  React 前端   │  │  导入 API     │  │   查询 API     │ │
+│  │  (Vite 构建)  │  │ /api/import/* │  │  /api/query/*  │ │
+│  │  / /import    │  │               │  │  + SSE 流式    │ │
+│  │  /chat        │  └───────┬──────┘  └───────┬───────┘ │
+│  └──────────────┘          │                 │          │
+│  ┌─────────────────────────▼─────────────────▼────────┐ │
+│  │         导入 LangGraph (7节点) / 检索 LangGraph     │ │
+│  └───────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
             │                          │
   ┌─────────▼──────────────────────────▼──────────────┐
   │              基础设施层 (Docker Compose)            │
   │  ┌────────┐  ┌────────┐  ┌─────────┐  ┌────────┐ │
   │  │ Milvus │  │ MinIO  │  │ MongoDB │  │  etcd  │ │
-  │  │ 向量检索 │  │ 文件存储│  │ 对话历史 │  │  服务  │ │
   │  └────────┘  └────────┘  └─────────┘  └────────┘ │
   └───────────────────────────────────────────────────┘
             │                          │
@@ -38,40 +37,51 @@
 
 | 层级 | 技术 |
 |------|------|
-| 前端 | 原生 HTML/CSS/JS，侧边栏布局 + SSE 流式接收 |
-| 工作流编排 | LangGraph |
-| Web 框架 | FastAPI + SSE 流式输出 |
-| 向量数据库 | Milvus 2.4（Dense + BM25 混合检索） |
-| 文件存储 | MinIO |
-| 对话历史 | MongoDB |
-| AI 模型 | 阿里云百炼（Qwen-Plus / Qwen-VL-Plus / text-embedding-v3 / gte-rerank） |
-| PDF 解析 | MinerU (magic-pdf) |
-| 基础设施 | Docker Compose |
-| Python | 3.11+ |
+| **前端** | React 18 + TypeScript + Vite + Tailwind CSS |
+| **前端渲染** | react-markdown + remark-gfm + rehype-highlight (代码高亮) |
+| **后端** | FastAPI + SSE 流式输出 + LangGraph |
+| **向量数据库** | Milvus 2.4（Dense + BM25 混合检索） |
+| **文件存储** | MinIO |
+| **对话历史** | MongoDB |
+| **AI 模型** | 阿里云百炼（Qwen-Plus / Qwen-VL-Plus / text-embedding-v3 / gte-rerank） |
+| **PDF 解析** | MinerU (magic-pdf) |
+| **基础设施** | Docker Compose |
+| **包管理** | uv (后端) + npm (前端) |
+| **Python** | 3.11+ |
 
 ## 项目结构
 
 ```
 advanced_rag/
 ├── docker-compose.yml                   # 基础设施编排
-├── pyproject.toml                       # 项目依赖
 ├── .env.example                         # 环境变量模板
 ├── README.md
 │
-├── frontend/                            # ═══ 前端服务 ═══
-│   ├── index.html                       #   系统首页 (Dashboard)
-│   ├── import.html                      #   知识库导入页面
-│   ├── chat.html                        #   智能问答页面
-│   ├── css/common.css                   #   公共样式 (侧边栏/卡片/按钮)
-│   └── js/
-│       ├── config.js                    #   API 端点 + 导入节点配置
-│       ├── api.js                       #   API 封装层
-│       ├── index.js                     #   首页逻辑 (健康检查)
-│       ├── import.js                    #   导入逻辑 (上传+轮询)
-│       └── chat.js                      #   问答逻辑 (SSE 流式)
+├── frontend/                            # ═══ 前端 (React + Vite + TS) ═══
+│   ├── package.json                     #   npm 依赖
+│   ├── vite.config.ts                   #   Vite 配置 (开发代理 → :8000)
+│   ├── tsconfig.json
+│   ├── tailwind.config.js
+│   ├── postcss.config.js
+│   ├── index.html                       #   HTML 入口
+│   └── src/
+│       ├── main.tsx                     #   React 入口
+│       ├── App.tsx                      #   路由定义
+│       ├── index.css                    #   全局样式 + Tailwind + Markdown
+│       ├── api/client.ts                #   API 封装 (fetch + SSE)
+│       ├── types/index.ts               #   TypeScript 类型定义
+│       ├── components/
+│       │   ├── Layout.tsx               #   侧边栏布局
+│       │   ├── MessageBubble.tsx        #   聊天消息 (Markdown 渲染)
+│       │   └── TypingIndicator.tsx      #   打字动画
+│       └── pages/
+│           ├── Dashboard.tsx            #   系统首页
+│           ├── ImportPage.tsx           #   知识库导入
+│           └── ChatPage.tsx             #   智能问答 (SSE 流式)
 │
-├── backend/                             # ═══ 后端服务 ═══
-│   ├── main.py                          #   FastAPI 主应用入口（前端 + API）
+├── backend/                             # ═══ 后端 (FastAPI + LangGraph) ═══
+│   ├── pyproject.toml                   #   uv 项目配置 + 依赖
+│   ├── main.py                          #   FastAPI 主应用入口
 │   │
 │   ├── app/
 │   │   ├── core/                        #   核心工具
@@ -97,52 +107,26 @@ advanced_rag/
 │   │   │   ├── task_utils.py            #     任务状态管理
 │   │   │   ├── sse_utils.py             #     SSE 事件队列
 │   │   │   ├── path_util.py             #     项目路径工具
-│   │   │   └── escape_milvus_string_utils.py  # Milvus 字符串转义
+│   │   │   └── escape_milvus_string_utils.py
 │   │   ├── import_process/              #   导入流程
 │   │   │   ├── agent/
 │   │   │   │   ├── state.py             #     ImportGraphState
 │   │   │   │   ├── main_graph.py        #     导入图编排 (7 节点)
-│   │   │   │   └── nodes/
-│   │   │   │       ├── node_entry.py        # ① 入口：文件类型判断
-│   │   │   │       ├── node_pdf_to_md.py    # ② PDF→Markdown (MinerU)
-│   │   │   │       ├── node_md_img.py       # ③ 图片处理 (VLM)
-│   │   │   │       ├── node_document_split.py# ④ 文档切分
-│   │   │   │       ├── node_item_name_recognition.py # ⑤ 商品名识别
-│   │   │   │       ├── node_bge_embedding.py# ⑥ 向量化 (Embedding API)
-│   │   │   │       └── node_import_milvus.py# ⑦ 入库 Milvus
-│   │   │   └── api/file_import_service.py   # 导入 FastAPI 路由
+│   │   │   │   └── nodes/               #     7 个节点实现
+│   │   │   └── api/file_import_service.py
 │   │   └── query_process/               #   查询流程
 │   │       ├── agent/
 │   │       │   ├── state.py             #     QueryGraphState
 │   │       │   ├── main_graph.py        #     检索图编排 (7 节点)
-│   │       │   └── nodes/
-│   │       │       ├── node_item_name_confirm.py    # ① 商品名确认+查询改写
-│   │       │       ├── node_search_embedding.py     # ② 向量+BM25混合检索
-│   │       │       ├── node_search_embedding_hyde.py# ③ HyDE假设性文档检索
-│   │       │       ├── node_web_search_mcp.py       # ④ 百炼MCP网络搜索
-│   │       │       ├── node_rrf.py                  # ⑤ RRF多路融合
-│   │       │       ├── node_rerank.py               # ⑥ gte-rerank重排
-│   │       │       └── node_answer_output.py        # ⑦ LLM流式回答+SSE
-│   │       └── api/query_service.py     #   查询 FastAPI 路由
+│   │       │   └── nodes/               #     7 个节点实现
+│   │       └── api/query_service.py
 │   │
 │   ├── prompts/                         #   Prompt 模板
-│   │   ├── item_name_recognition.prompt
-│   │   ├── item_name_confirm.prompt
-│   │   ├── hyde_generate.prompt
-│   │   └── answer_out.prompt
-│   │
 │   ├── test/                            #   测试脚本
-│   │   ├── 02_import_graph_flow.py      #     导入图测试
-│   │   ├── 03_query_graph_flow.py       #     检索图测试
-│   │   └── 04_e2e_integration_test.py   #     端到端集成测试
-│   │
-│   └── examples/                        #   示例文件
-│       ├── Sample1.pdf
-│       ├── Sample2.pdf
-│       └── Sample3.pdf
+│   └── examples/                        #   示例 PDF
 │
 ├── specs/design-spec.md                 # 设计规格文档
-└── docs/superpowers/plans/              # 实现计划文档
+└── docs/                                # 实现计划文档
 ```
 
 ## 快速开始
@@ -154,19 +138,25 @@ advanced_rag/
 git clone git@github.com:zgsddzwj/advanced_rag.git
 cd advanced_rag
 
-# 创建虚拟环境
+# 后端：uv 创建虚拟环境并安装依赖
+cd backend
 uv venv .venv
 source .venv/bin/activate
+uv pip install -e "."
 
-# 安装依赖
-uv pip install -r pyproject.toml
+# 前端：npm 安装依赖
+cd ../frontend
+npm install
 ```
 
 ### 2. 配置环境变量
 
 ```bash
+# 在项目根目录
 cp .env.example .env
 # 编辑 .env，填入真实的 DASHSCOPE_API_KEY
+# 同时复制一份到 backend/ 目录（后端从此目录加载）
+cp .env backend/.env
 ```
 
 ### 3. 启动基础设施
@@ -181,16 +171,37 @@ docker compose up -d
 - **MongoDB** — 对话历史 (:27017)
 - **etcd** — Milvus 依赖服务 (:2379)
 
-### 4. 启动应用
+### 4. 构建前端
 
 ```bash
-python backend/main.py
+cd frontend
+npm run build    # 产物输出到 frontend/dist/
+```
+
+### 5. 启动应用
+
+```bash
+cd backend
+python main.py
 ```
 
 访问 http://localhost:8000 即可使用：
 - 系统首页：http://localhost:8000/
 - 导入页面：http://localhost:8000/import
 - 聊天页面：http://localhost:8000/chat
+
+### 开发模式（可选）
+
+前端开发时使用 Vite 热更新：
+
+```bash
+# 终端 1：启动后端
+cd backend && python main.py
+
+# 终端 2：启动 Vite 开发服务器
+cd frontend && npm run dev
+# 访问 http://localhost:3000 (API 自动代理到 :8000)
+```
 
 ## 核心流程
 
@@ -200,14 +211,6 @@ python backend/main.py
 入口判断 → PDF转Markdown → 图片处理(VLM) → 文档切分
     → 商品名识别(LLM) → 向量化(Embedding API) → 入库Milvus
 ```
-
-1. **入口判断**：识别文件类型（PDF/MD），提取文件名
-2. **PDF转Markdown**：调用 MinerU (magic-pdf) 解析 PDF
-3. **图片处理**：扫描 Markdown 图片 → 上传 MinIO → VLM 生成描述 → 替换链接
-4. **文档切分**：基于标题层级递归切分，拼接标题路径
-5. **商品名识别**：LLM 从内容中提取商品/设备名称
-6. **向量化**：调用 text-embedding-v3 API 批量生成稠密向量
-7. **入库Milvus**：创建集合（含 BM25 Function）→ 批量插入
 
 ### 查询流程（7 节点 LangGraph + SSE）
 
@@ -232,7 +235,7 @@ python backend/main.py
 | `/` | 系统首页 (Dashboard) |
 | `/import` | 知识库导入页面 |
 | `/chat` | 智能问答页面 |
-| `/static/*` | 静态资源 (CSS/JS) |
+| `/assets/*` | 前端构建产物 (CSS/JS) |
 
 ### 导入 API
 
@@ -254,14 +257,16 @@ python backend/main.py
 ## 测试
 
 ```bash
+cd backend
+
 # 导入图结构测试
-python backend/test/02_import_graph_flow.py
+python test/02_import_graph_flow.py
 
 # 检索图结构测试（含 RRF 算法验证）
-python backend/test/03_query_graph_flow.py
+python test/03_query_graph_flow.py
 
 # 端到端集成测试（10 项验证）
-python backend/test/04_e2e_integration_test.py
+python test/04_e2e_integration_test.py
 ```
 
 ## 许可证

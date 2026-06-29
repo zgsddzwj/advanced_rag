@@ -1,6 +1,7 @@
 [project]
 name = "advanced-rag"
-version = "0.1.0"
+version = "1.0.0"
+description = "Advanced RAG System — LangGraph + Milvus + Aliyun Bailei"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",
@@ -24,3 +25,10 @@ dependencies = [
     "regex",
     "requests",
 ]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
