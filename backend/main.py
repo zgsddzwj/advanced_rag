@@ -13,8 +13,8 @@ from app.core.logger import logger
 from app.import_process.api.file_import_service import router as import_router
 from app.query_process.api.query_service import router as query_router
 
-# 前端静态文件目录
-FRONTEND_DIR = Path(__file__).parent / "frontend"
+# 前端静态文件目录（位于项目根目录的 frontend/）
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 
 @asynccontextmanager

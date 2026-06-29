@@ -53,10 +53,10 @@
 
 ```
 advanced_rag/
-├── main.py                              # FastAPI 主应用入口（前端 + API）
 ├── docker-compose.yml                   # 基础设施编排
 ├── pyproject.toml                       # 项目依赖
 ├── .env.example                         # 环境变量模板
+├── README.md
 │
 ├── frontend/                            # ═══ 前端服务 ═══
 │   ├── index.html                       #   系统首页 (Dashboard)
@@ -70,73 +70,76 @@ advanced_rag/
 │       ├── import.js                    #   导入逻辑 (上传+轮询)
 │       └── chat.js                      #   问答逻辑 (SSE 流式)
 │
-├── app/
-│   ├── core/                            # 核心工具
-│   │   ├── logger.py                    #   日志 (loguru)
-│   │   └── load_prompt.py               #   Prompt 模板加载器
-│   ├── conf/                            # 配置层
-│   │   ├── lm_config.py                 #   AI 模型配置
-│   │   ├── milvus_config.py             #   Milvus 配置
-│   │   ├── bailian_mcp_config.py        #   百炼 MCP 配置
-│   │   ├── mineru_config.py             #   MinerU 配置
-│   │   └── embedding_config.py          #   Embedding 配置
-│   ├── lm/                              # AI 模型封装层
-│   │   ├── lm_utils.py                  #   LLM (Qwen-Plus)
-│   │   ├── vlm_utils.py                 #   VLM (Qwen-VL-Plus)
-│   │   ├── embedding_utils.py           #   Embedding (text-embedding-v3)
-│   │   ├── rerank_utils.py              #   Rerank (gte-rerank)
-│   │   └── web_search_utils.py          #   网络搜索 (百炼 MCP)
-│   ├── clients/                         # 基础设施客户端
-│   │   ├── milvus_utils.py              #   Milvus 连接 + 混合搜索
-│   │   ├── minio_utils.py               #   MinIO 文件操作
-│   │   └── mongo_history_utils.py       #   MongoDB 对话历史
-│   ├── utils/                           # 通用工具
-│   │   ├── task_utils.py                #   任务状态管理
-│   │   ├── sse_utils.py                 #   SSE 事件队列
-│   │   ├── path_util.py                 #   项目路径工具
-│   │   └── escape_milvus_string_utils.py#   Milvus 字符串转义
-│   ├── import_process/                  # 导入流程
-│   │   ├── agent/
-│   │   │   ├── state.py                 #   ImportGraphState
-│   │   │   ├── main_graph.py            #   导入图编排 (7 节点)
-│   │   │   └── nodes/
-│   │   │       ├── node_entry.py        #   ① 入口：文件类型判断
-│   │   │       ├── node_pdf_to_md.py    #   ② PDF→Markdown (MinerU)
-│   │   │       ├── node_md_img.py       #   ③ 图片处理 (VLM)
-│   │   │       ├── node_document_split.py#  ④ 文档切分
-│   │   │       ├── node_item_name_recognition.py # ⑤ 商品名识别 (LLM)
-│   │   │       ├── node_bge_embedding.py#   ⑥ 向量化 (Embedding API)
-│   │   │       └── node_import_milvus.py#   ⑦ 入库 Milvus
-│   │   └── api/file_import_service.py   #   导入 FastAPI 路由
-│   └── query_process/                   # 查询流程
-│       ├── agent/
-│       │   ├── state.py                 #   QueryGraphState
-│       │   ├── main_graph.py            #   检索图编排 (7 节点)
-│       │   └── nodes/
-│       │       ├── node_item_name_confirm.py    # ① 商品名确认+查询改写
-│       │       ├── node_search_embedding.py     # ② 向量+BM25混合检索
-│       │       ├── node_search_embedding_hyde.py# ③ HyDE假设性文档检索
-│       │       ├── node_web_search_mcp.py       # ④ 百炼MCP网络搜索
-│       │       ├── node_rrf.py                  # ⑤ RRF多路融合
-│       │       ├── node_rerank.py               # ⑥ gte-rerank重排
-│       │       └── node_answer_output.py        # ⑦ LLM流式回答+SSE
-│       └── api/query_service.py         #   查询 FastAPI 路由
-│
-├── prompts/                             # Prompt 模板
-│   ├── item_name_recognition.prompt
-│   ├── item_name_confirm.prompt
-│   ├── hyde_generate.prompt
-│   └── answer_out.prompt
-│
-├── test/                                # 测试脚本
-│   ├── 02_import_graph_flow.py          #   导入图测试
-│   ├── 03_query_graph_flow.py           #   检索图测试
-│   └── 04_e2e_integration_test.py       #   端到端集成测试
-│
-├── examples/                            # 示例文件
-│   ├── Sample1.pdf
-│   ├── Sample2.pdf
-│   └── Sample3.pdf
+├── backend/                             # ═══ 后端服务 ═══
+│   ├── main.py                          #   FastAPI 主应用入口（前端 + API）
+│   │
+│   ├── app/
+│   │   ├── core/                        #   核心工具
+│   │   │   ├── logger.py                #     日志 (loguru)
+│   │   │   └── load_prompt.py           #     Prompt 模板加载器
+│   │   ├── conf/                        #   配置层
+│   │   │   ├── lm_config.py             #     AI 模型配置
+│   │   │   ├── milvus_config.py         #     Milvus 配置
+│   │   │   ├── bailian_mcp_config.py    #     百炼 MCP 配置
+│   │   │   ├── mineru_config.py         #     MinerU 配置
+│   │   │   └── embedding_config.py      #     Embedding 配置
+│   │   ├── lm/                          #   AI 模型封装层
+│   │   │   ├── lm_utils.py              #     LLM (Qwen-Plus)
+│   │   │   ├── vlm_utils.py             #     VLM (Qwen-VL-Plus)
+│   │   │   ├── embedding_utils.py       #     Embedding (text-embedding-v3)
+│   │   │   ├── rerank_utils.py          #     Rerank (gte-rerank)
+│   │   │   └── web_search_utils.py      #     网络搜索 (百炼 MCP)
+│   │   ├── clients/                     #   基础设施客户端
+│   │   │   ├── milvus_utils.py          #     Milvus 连接 + 混合搜索
+│   │   │   ├── minio_utils.py           #     MinIO 文件操作
+│   │   │   └── mongo_history_utils.py   #     MongoDB 对话历史
+│   │   ├── utils/                       #   通用工具
+│   │   │   ├── task_utils.py            #     任务状态管理
+│   │   │   ├── sse_utils.py             #     SSE 事件队列
+│   │   │   ├── path_util.py             #     项目路径工具
+│   │   │   └── escape_milvus_string_utils.py  # Milvus 字符串转义
+│   │   ├── import_process/              #   导入流程
+│   │   │   ├── agent/
+│   │   │   │   ├── state.py             #     ImportGraphState
+│   │   │   │   ├── main_graph.py        #     导入图编排 (7 节点)
+│   │   │   │   └── nodes/
+│   │   │   │       ├── node_entry.py        # ① 入口：文件类型判断
+│   │   │   │       ├── node_pdf_to_md.py    # ② PDF→Markdown (MinerU)
+│   │   │   │       ├── node_md_img.py       # ③ 图片处理 (VLM)
+│   │   │   │       ├── node_document_split.py# ④ 文档切分
+│   │   │   │       ├── node_item_name_recognition.py # ⑤ 商品名识别
+│   │   │   │       ├── node_bge_embedding.py# ⑥ 向量化 (Embedding API)
+│   │   │   │       └── node_import_milvus.py# ⑦ 入库 Milvus
+│   │   │   └── api/file_import_service.py   # 导入 FastAPI 路由
+│   │   └── query_process/               #   查询流程
+│   │       ├── agent/
+│   │       │   ├── state.py             #     QueryGraphState
+│   │       │   ├── main_graph.py        #     检索图编排 (7 节点)
+│   │       │   └── nodes/
+│   │       │       ├── node_item_name_confirm.py    # ① 商品名确认+查询改写
+│   │       │       ├── node_search_embedding.py     # ② 向量+BM25混合检索
+│   │       │       ├── node_search_embedding_hyde.py# ③ HyDE假设性文档检索
+│   │       │       ├── node_web_search_mcp.py       # ④ 百炼MCP网络搜索
+│   │       │       ├── node_rrf.py                  # ⑤ RRF多路融合
+│   │       │       ├── node_rerank.py               # ⑥ gte-rerank重排
+│   │       │       └── node_answer_output.py        # ⑦ LLM流式回答+SSE
+│   │       └── api/query_service.py     #   查询 FastAPI 路由
+│   │
+│   ├── prompts/                         #   Prompt 模板
+│   │   ├── item_name_recognition.prompt
+│   │   ├── item_name_confirm.prompt
+│   │   ├── hyde_generate.prompt
+│   │   └── answer_out.prompt
+│   │
+│   ├── test/                            #   测试脚本
+│   │   ├── 02_import_graph_flow.py      #     导入图测试
+│   │   ├── 03_query_graph_flow.py       #     检索图测试
+│   │   └── 04_e2e_integration_test.py   #     端到端集成测试
+│   │
+│   └── examples/                        #   示例文件
+│       ├── Sample1.pdf
+│       ├── Sample2.pdf
+│       └── Sample3.pdf
 │
 ├── specs/design-spec.md                 # 设计规格文档
 └── docs/superpowers/plans/              # 实现计划文档
@@ -181,7 +184,7 @@ docker compose up -d
 ### 4. 启动应用
 
 ```bash
-python main.py
+python backend/main.py
 ```
 
 访问 http://localhost:8000 即可使用：
@@ -252,13 +255,13 @@ python main.py
 
 ```bash
 # 导入图结构测试
-python test/02_import_graph_flow.py
+python backend/test/02_import_graph_flow.py
 
 # 检索图结构测试（含 RRF 算法验证）
-python test/03_query_graph_flow.py
+python backend/test/03_query_graph_flow.py
 
 # 端到端集成测试（10 项验证）
-python test/04_e2e_integration_test.py
+python backend/test/04_e2e_integration_test.py
 ```
 
 ## 许可证
