@@ -81,6 +81,7 @@ advanced_rag/
 │
 ├── backend/                             # ═══ 后端 (FastAPI + LangGraph) ═══
 │   ├── pyproject.toml                   #   uv 项目配置 + 依赖
+│   ├── uv.lock                          #   依赖版本锁定
 │   ├── main.py                          #   FastAPI 主应用入口
 │   │
 │   ├── app/
@@ -91,8 +92,7 @@ advanced_rag/
 │   │   │   ├── lm_config.py             #     AI 模型配置
 │   │   │   ├── milvus_config.py         #     Milvus 配置
 │   │   │   ├── bailian_mcp_config.py    #     百炼 MCP 配置
-│   │   │   ├── mineru_config.py         #     MinerU 配置
-│   │   │   └── embedding_config.py      #     Embedding 配置
+│   │   │   └── mineru_config.py         #     MinerU 配置
 │   │   ├── lm/                          #   AI 模型封装层
 │   │   │   ├── lm_utils.py              #     LLM (Qwen-Plus)
 │   │   │   ├── vlm_utils.py             #     VLM (Qwen-VL-Plus)
@@ -123,7 +123,8 @@ advanced_rag/
 │   │
 │   ├── prompts/                         #   Prompt 模板
 │   ├── test/                            #   测试脚本
-│   └── examples/                        #   示例 PDF
+│   ├── examples/                        #   示例 PDF
+│   └── logs/                            #   运行日志
 │
 ├── specs/design-spec.md                 # 设计规格文档
 └── docs/                                # 实现计划文档
@@ -138,11 +139,9 @@ advanced_rag/
 git clone git@github.com:zgsddzwj/advanced_rag.git
 cd advanced_rag
 
-# 后端：uv 创建虚拟环境并安装依赖
+# 后端：uv 自动创建虚拟环境并安装依赖
 cd backend
-uv venv .venv
-source .venv/bin/activate
-uv pip install -e "."
+uv sync
 
 # 前端：npm 安装依赖
 cd ../frontend
@@ -152,11 +151,10 @@ npm install
 ### 2. 配置环境变量
 
 ```bash
-# 在项目根目录
-cp .env.example .env
-# 编辑 .env，填入真实的 DASHSCOPE_API_KEY
-# 同时复制一份到 backend/ 目录（后端从此目录加载）
-cp .env backend/.env
+# 复制模板到 backend/ 目录（后端从此目录加载 .env）
+cp .env.example backend/.env
+# 编辑 backend/.env，填入真实的 DASHSCOPE_API_KEY
+# 获取地址：https://bailian.console.aliyun.com/ → 模型广场 → API Key
 ```
 
 ### 3. 启动基础设施
@@ -182,8 +180,10 @@ npm run build    # 产物输出到 frontend/dist/
 
 ```bash
 cd backend
-python main.py
+uv run python main.py
 ```
+
+启动时会自动校验 `DASHSCOPE_API_KEY` 配置，若为占位符会输出警告提示。
 
 访问 http://localhost:8000 即可使用：
 - 系统首页：http://localhost:8000/
@@ -196,7 +196,7 @@ python main.py
 
 ```bash
 # 终端 1：启动后端
-cd backend && python main.py
+cd backend && uv run python main.py
 
 # 终端 2：启动 Vite 开发服务器
 cd frontend && npm run dev
@@ -260,13 +260,13 @@ cd frontend && npm run dev
 cd backend
 
 # 导入图结构测试
-python test/02_import_graph_flow.py
+uv run python test/02_import_graph_flow.py
 
 # 检索图结构测试（含 RRF 算法验证）
-python test/03_query_graph_flow.py
+uv run python test/03_query_graph_flow.py
 
 # 端到端集成测试（10 项验证）
-python test/04_e2e_integration_test.py
+uv run python test/04_e2e_integration_test.py
 ```
 
 ## 许可证
