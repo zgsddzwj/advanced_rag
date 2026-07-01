@@ -155,13 +155,20 @@ def _stream_generate(prompt: str, task_id: str) -> str:
     ]
 
     full_answer = []
-    for chunk in llm.stream(messages):
-        token = getattr(chunk, "content", "")
-        if token:
-            full_answer.append(token)
-            # 推送 delta 事件（task_id 与 SSE 队列创建时的 key 一致）
-            if task_id:
-                push_to_session(task_id, SSEEvent.DELTA, {"text": token})
+    try:
+        for chunk in llm.stream(messages):
+            token = getattr(chunk, "content", "")
+            if token:
+                full_answer.append(token)
+                # 推送 delta 事件（task_id 与 SSE 队列创建时的 key 一致）
+                if task_id:
+                    push_to_session(task_id, SSEEvent.DELTA, {"text": token})
+    except Exception as e:
+        logger.error(f"LLM 流式生成失败: {e}")
+        if not full_answer:
+            raise
+        # 已有部分回答，追加错误提示后返回
+        logger.warning("已有部分回答，追加错误提示")
 
     return "".join(full_answer)
 

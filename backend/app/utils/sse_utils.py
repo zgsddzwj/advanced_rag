@@ -83,11 +83,11 @@ async def sse_generator(session_id: str, request=None):
 
     queue = _sse_queues[session_id]
 
-    # 检查客户端是否断开
-    def is_disconnected():
+    # 检查客户端是否断开（异步方法，需 await）
+    async def is_disconnected():
         if request is not None:
             try:
-                return request.is_disconnected()
+                return await request.is_disconnected()
             except Exception:
                 return False
         return False
@@ -96,7 +96,7 @@ async def sse_generator(session_id: str, request=None):
     yield f"event: ready\ndata: {json.dumps({'session_id': session_id})}\n\n"
 
     while True:
-        if is_disconnected():
+        if await is_disconnected():
             logger.info(f"SSE 客户端断开: {session_id}")
             break
 
