@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.logger import logger
+from app.conf.lm_config import lm_config
 from app.import_process.api.file_import_service import router as import_router
 from app.query_process.api.query_service import router as query_router
 
@@ -20,6 +21,16 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("===== Advanced RAG 服务启动 =====")
+
+    # 校验百炼 API Key
+    api_key = lm_config.DASHSCOPE_API_KEY
+    if not api_key or api_key.startswith("sk-xxxx"):
+        logger.warning("⚠️  DASHSCOPE_API_KEY 未配置或为占位符！")
+        logger.warning("⚠️  请在项目根目录 .env 文件中填入真实的阿里云百炼 API Key")
+        logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 模型广场 → API Key")
+    else:
+        logger.info(f"百炼 API Key 已配置: {api_key[:8]}...{api_key[-4:]}")
+
     yield
     logger.info("===== Advanced RAG 服务关闭 =====")
 
