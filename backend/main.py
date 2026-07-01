@@ -11,6 +11,8 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
+from app.conf.mineru_config import mineru_config
+from app.conf.bailian_mcp_config import bailian_mcp_config
 from app.import_process.api.file_import_service import router as import_router
 from app.query_process.api.query_service import router as query_router
 
@@ -30,6 +32,22 @@ async def lifespan(app: FastAPI):
         logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 模型广场 → API Key")
     else:
         logger.info(f"百炼 API Key 已配置: {api_key[:8]}...{api_key[-4:]}")
+
+    # 校验 MinerU API Token（PDF 导入需要）
+    mineru_token = mineru_config.API_TOKEN
+    if not mineru_token or mineru_token.startswith("your_"):
+        logger.warning("⚠️  MINERU_API_TOKEN 未配置或为占位符！PDF 导入功能将不可用")
+        logger.warning("⚠️  获取地址: https://mineru.net/ → 个人中心 → API Token")
+    else:
+        logger.info(f"MinerU API Token 已配置: {mineru_token[:8]}...")
+
+    # 校验百炼 MCP App ID（网络搜索需要）
+    mcp_app_id = bailian_mcp_config.BAILIAN_MCP_APP_ID
+    if not mcp_app_id or mcp_app_id.startswith("your_"):
+        logger.warning("⚠️  BAILIAN_MCP_APP_ID 未配置或为占位符！网络搜索功能将不可用")
+        logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 应用广场 → 创建应用")
+    else:
+        logger.info(f"百炼 MCP App ID 已配置: {mcp_app_id}")
 
     yield
     logger.info("===== Advanced RAG 服务关闭 =====")

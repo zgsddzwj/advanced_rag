@@ -83,28 +83,19 @@ async def sse_generator(session_id: str, request=None):
 
     queue = _sse_queues[session_id]
 
-    # 检查客户端是否断开（异步方法，需 await）
-    async def is_disconnected():
-        if request is not None:
-            try:
-                return await request.is_disconnected()
-            except Exception:
-                return False
-        return False
-
     # 发送 ready 事件
     yield f"event: ready\ndata: {json.dumps({'session_id': session_id})}\n\n"
 
     while True:
-        if await is_disconnected():
-            logger.info(f"SSE 客户端断开: {session_id}")
-            break
-
         try:
             msg = await asyncio.wait_for(queue.get(), timeout=30.0)
         except asyncio.TimeoutError:
-            # 发送心跳
-            yield f": heartbeat\n\n"
+            # 发送心跳，同时检测客户端是否还在线
+            try:
+                yield f": heartbeat\n\n"
+            except Exception:
+                logger.info(f"SSE 客户端断开（心跳失败）: {session_id}")
+                break
             continue
 
         if msg is None:
@@ -113,7 +104,11 @@ async def sse_generator(session_id: str, request=None):
 
         event_name = msg["event"]
         data_str = json.dumps(msg["data"], ensure_ascii=False)
-        yield f"event: {event_name}\ndata: {data_str}\n\n"
+        try:
+            yield f"event: {event_name}\ndata: {data_str}\n\n"
+        except Exception:
+            logger.info(f"SSE 客户端断开（推送失败）: {session_id}")
+            break
 
         if event_name == SSEEvent.FINAL.value or event_name == SSEEvent.ERROR.value:
             break
