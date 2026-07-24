@@ -18,7 +18,7 @@ export default function Layout() {
     healthCheck().then(() => setOnline(true)).catch(() => setOnline(false))
   }, [])
 
-  const pageTitle = navItems.find(n => n.to === location.pathname)?.label || '掌柜智库'
+  const pageTitle = navItems.find(n => n.to === location.pathname)?.label || 'NexusRAG'
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -31,7 +31,7 @@ export default function Layout() {
               <BookOpen size={22} />
             </div>
             <div>
-              <div className="font-bold text-lg leading-tight">掌柜智库</div>
+              <div className="font-bold text-lg leading-tight">NexusRAG</div>
               <div className="text-xs text-white/40">Advanced RAG</div>
             </div>
           </div>

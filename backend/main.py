@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
         logger.info(f"百炼 MCP App ID 已配置: {mcp_app_id}")
 
     yield
-    logger.info("===== Advanced RAG 服务关闭 =====")
+    logger.info("===== NexusRAG 服务关闭 =====")
 
 
 app = FastAPI(title="Advanced RAG", lifespan=lifespan)

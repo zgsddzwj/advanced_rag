@@ -20,7 +20,7 @@ export default function Dashboard() {
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-10 text-white relative overflow-hidden">
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold mb-2">📚 掌柜智库 — 高级 RAG 系统</h1>
+          <h1 className="text-3xl font-bold mb-2">📚 NexusRAG — 智能知识检索引擎</h1>
           <p className="text-white/80">基于 LangGraph 编排 · 混合检索 (Dense + BM25) · 阿里云百炼 AI 全链路接入</p>
         </div>
         <div className="absolute -top-20 -right-10 w-80 h-80 bg-white/10 rounded-full" />

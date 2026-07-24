@@ -1,6 +1,10 @@
-# 掌柜智库 — 高级 RAG 系统
+# NexusRAG — 智能知识检索引擎
 
-基于 LangGraph 编排的高级检索增强生成（RAG）系统，包含完整的**文档导入**和**智能问答**两条流程，全部 AI 能力通过阿里云百炼 API 接入。
+> 基于 LangGraph 编排的企业级 RAG 系统，支持 PDF/MD 智能导入、Dense+BM25 混合检索、HyDE 增强、RRF 融合与 Rerank 精排，提供流式问答体验。
+
+## 项目简介
+
+NexusRAG 是一套完整的检索增强生成（RAG）系统，包含**文档导入**和**智能问答**两条核心流程，全部 AI 能力通过阿里云百炼 API 接入。系统采用 LangGraph 进行节点编排，实现从文档上传、解析、切分、向量化到多路混合检索、融合重排、流式回答的全链路自动化。
 
 ## 架构概览
 
@@ -40,11 +44,11 @@
 | **前端** | React 18 + TypeScript + Vite + Tailwind CSS |
 | **前端渲染** | react-markdown + remark-gfm + rehype-highlight (代码高亮) |
 | **后端** | FastAPI + SSE 流式输出 + LangGraph |
-| **向量数据库** | Milvus 2.4（Dense + BM25 混合检索） |
+| **向量数据库** | Milvus 2.5（Dense + BM25 混合检索） |
 | **文件存储** | MinIO |
 | **对话历史** | MongoDB |
 | **AI 模型** | 阿里云百炼（Qwen-Plus / Qwen-VL-Plus / text-embedding-v3 / gte-rerank） |
-| **PDF 解析** | MinerU (magic-pdf) |
+| **PDF 解析** | MinerU 云端 API |
 | **基础设施** | Docker Compose |
 | **包管理** | uv (后端) + npm (前端) |
 | **Python** | 3.11+ |
@@ -73,11 +77,13 @@ advanced_rag/
 │       ├── components/
 │       │   ├── Layout.tsx               #   侧边栏布局
 │       │   ├── MessageBubble.tsx        #   聊天消息 (Markdown 渲染)
+│       │   ├── ThinkingProcess.tsx      #   思考过程展示
 │       │   └── TypingIndicator.tsx      #   打字动画
 │       └── pages/
 │           ├── Dashboard.tsx            #   系统首页
 │           ├── ImportPage.tsx           #   知识库导入
-│           └── ChatPage.tsx             #   智能问答 (SSE 流式)
+│           ├── ChatPage.tsx             #   智能问答 (SSE 流式)
+│           └── DocumentsPage.tsx        #   文档预览
 │
 ├── backend/                             # ═══ 后端 (FastAPI + LangGraph) ═══
 │   ├── pyproject.toml                   #   uv 项目配置 + 依赖
@@ -106,6 +112,7 @@ advanced_rag/
 │   │   ├── utils/                       #   通用工具
 │   │   │   ├── task_utils.py            #     任务状态管理
 │   │   │   ├── sse_utils.py             #     SSE 事件队列
+│   │   │   ├── thinking_utils.py        #     思考过程推送
 │   │   │   ├── path_util.py             #     项目路径工具
 │   │   │   └── escape_milvus_string_utils.py
 │   │   ├── import_process/              #   导入流程
@@ -189,6 +196,7 @@ uv run python main.py
 - 系统首页：http://localhost:8000/
 - 导入页面：http://localhost:8000/import
 - 聊天页面：http://localhost:8000/chat
+- 文档预览：http://localhost:8000/documents
 
 ### 开发模式（可选）
 
@@ -235,6 +243,7 @@ cd frontend && npm run dev
 | `/` | 系统首页 (Dashboard) |
 | `/import` | 知识库导入页面 |
 | `/chat` | 智能问答页面 |
+| `/documents` | 文档预览页面 |
 | `/assets/*` | 前端构建产物 (CSS/JS) |
 
 ### 导入 API
@@ -254,6 +263,13 @@ cd frontend && npm run dev
 | DELETE | `/api/query/history/{session_id}` | 清空对话历史 |
 | GET | `/api/query/health` | 健康检查 |
 
+### 文档预览 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/documents/list` | 获取已导入文档列表 |
+| GET | `/api/documents/chunks/{file_title}` | 获取文档切分详情 |
+
 ## 测试
 
 ```bash
@@ -268,6 +284,38 @@ uv run python test/03_query_graph_flow.py
 # 端到端集成测试（10 项验证）
 uv run python test/04_e2e_integration_test.py
 ```
+
+## 项目成熟度评估
+
+### ✅ 已具备的能力
+
+| 维度 | 说明 |
+|------|------|
+| **架构设计** | LangGraph 双流程编排，导入7节点 + 检索7节点，职责清晰 |
+| **检索能力** | Dense + BM25 混合检索 + HyDE 假设性检索 + 网络搜索补充 |
+| **排序能力** | RRF 多路融合 + gte-rerank 精排 + 动态截断 |
+| **流式体验** | SSE 流式回答 + 实时思考过程推送 |
+| **文档处理** | MinerU 云端 PDF 解析 + VLM 图片描述 + 智能切分 |
+| **错误容错** | 各节点 try/catch 降级处理，失败不阻断主流程 |
+| **基础设施** | Docker Compose 一键编排（Milvus + MinIO + MongoDB + etcd） |
+| **配置管理** | .env 环境变量 + 启动时自动校验 |
+| **文档预览** | 支持查看已导入文档列表及切分详情 |
+| **结构测试** | 导入图/检索图/端到端集成测试（10 项验证） |
+
+### ⚠️ 距离生产级还需补齐
+
+| 维度 | 现状 | 建议 |
+|------|------|------|
+| **认证鉴权** | 无认证，API 完全开放 | 添加 JWT / API Key 认证中间件 |
+| **限流防护** | 无限流 | 添加 rate limiter（如 slowapi） |
+| **任务队列** | threading + BackgroundTasks | 迁移至 Celery / ARQ 异步任务队列 |
+| **监控告警** | 仅 loguru 本地日志 | 接入 Prometheus + Grafana 指标监控 |
+| **CI/CD** | 无自动化流水线 | 搭建 GitHub Actions 自动测试 + 部署 |
+| **HTTPS** | 仅 HTTP | 配置 Nginx 反向代理 + TLS 证书 |
+| **负载测试** | 未做压测 | 使用 Locust / k6 验证并发承载能力 |
+| **数据备份** | 无备份策略 | Milvus 快照 + MongoDB 定期备份 |
+
+> **总结**：当前系统已具备完整的核心功能和良好的架构基础，可作为 **生产级 MVP** 投入小规模使用。要达到真正的企业级生产部署，建议优先补齐认证鉴权、任务队列和监控告警三项。
 
 ## 许可证
 

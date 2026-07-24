@@ -138,7 +138,7 @@ export default function ChatPage() {
               <MessageCircle size={32} className="text-indigo-500" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">欢迎使用掌柜智库</h2>
+              <h2 className="text-xl font-semibold text-gray-700 mb-2">欢迎使用 NexusRAG</h2>
               <p className="text-sm text-gray-400 max-w-md">
                 基于多路混合检索 (Dense + BM25 + HyDE + 网络搜索)，为您提供精准的智能问答服务。
               </p>
