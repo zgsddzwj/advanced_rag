@@ -23,6 +23,7 @@ from app.clients.milvus_utils import (
 from app.conf.milvus_config import milvus_config
 from app.utils.escape_milvus_string_utils import escape_milvus_string
 from app.utils.task_utils import add_running_task, add_done_task
+from app.utils.thinking_utils import push_thinking_start
 
 # HyDE 检索参数
 HYDE_SEARCH_LIMIT = 15
@@ -39,6 +40,7 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
     add_running_task(state["task_id"], func_name, is_stream)
+    push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
         query = state.get("rewritten_query") or state.get("query", "")

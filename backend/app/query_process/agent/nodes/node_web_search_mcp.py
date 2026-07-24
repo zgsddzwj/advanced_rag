@@ -9,6 +9,7 @@ from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
 from app.lm.web_search_utils import web_search
 from app.utils.task_utils import add_running_task, add_done_task
+from app.utils.thinking_utils import push_thinking_start
 
 # 网络搜索返回结果数量
 WEB_SEARCH_COUNT = 5
@@ -20,6 +21,7 @@ def node_web_search_mcp(state: QueryGraphState) -> QueryGraphState:
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
     add_running_task(state["task_id"], func_name, is_stream)
+    push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
         query = state.get("rewritten_query") or state.get("query", "")

@@ -20,6 +20,7 @@ from app.clients.milvus_utils import get_milvus_client
 from app.clients.mongo_history_utils import get_recent_messages, save_chat_message
 from app.conf.milvus_config import milvus_config
 from app.utils.task_utils import add_running_task, add_done_task
+from app.utils.thinking_utils import push_thinking_start, push_thinking_done
 
 # 商品名对齐相似度阈值
 ITEM_NAME_MATCH_THRESHOLD = 0.65
@@ -33,6 +34,7 @@ def node_item_name_confirm(state: QueryGraphState) -> QueryGraphState:
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
     add_running_task(state["task_id"], func_name, is_stream)
+    push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
         # Step 1: 加载对话历史

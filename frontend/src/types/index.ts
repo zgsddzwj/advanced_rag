@@ -61,6 +61,45 @@ export interface HealthResponse {
   service: string
 }
 
+// ==================== 文档预览 ====================
+
+export interface DocumentItem {
+  file_title: string
+  item_name: string
+  chunk_count: number
+  titles: string[]
+}
+
+export interface DocumentListResponse {
+  documents: DocumentItem[]
+  total: number
+  error?: string
+}
+
+export interface ChunkItem {
+  title: string
+  parent_title: string
+  part: number
+  content: string
+  item_name: string
+  file_title: string
+}
+
+export interface ChunkListResponse {
+  file_title: string
+  chunks: ChunkItem[]
+  total: number
+  error?: string
+}
+
+// ==================== 思考过程 SSE ====================
+
+export interface SSEThinkingData {
+  node: string
+  message: string
+  detail?: string
+}
+
 // ==================== 常量 ====================
 
 export const IMPORT_NODES: ImportNode[] = [

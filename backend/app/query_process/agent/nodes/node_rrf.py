@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
 from app.utils.task_utils import add_running_task, add_done_task
+from app.utils.thinking_utils import push_thinking_start
 
 # RRF 参数 k：平滑因子，通常取 60
 RRF_K = 60
@@ -21,6 +22,7 @@ def node_rrf(state: QueryGraphState) -> QueryGraphState:
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
     add_running_task(state["task_id"], func_name, is_stream)
+    push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
         embedding_chunks = state.get("embedding_chunks", [])

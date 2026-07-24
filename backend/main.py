@@ -14,6 +14,7 @@ from app.conf.lm_config import lm_config
 from app.conf.mineru_config import mineru_config
 from app.conf.bailian_mcp_config import bailian_mcp_config
 from app.import_process.api.file_import_service import router as import_router
+from app.import_process.api.document_preview_service import router as document_router
 from app.query_process.api.query_service import router as query_router
 
 # 前端构建产物目录（frontend/dist/）
@@ -57,6 +58,7 @@ app = FastAPI(title="Advanced RAG", lifespan=lifespan)
 
 # 注册后端 API 路由
 app.include_router(import_router, prefix="/api")
+app.include_router(document_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 
 # 挂载前端静态资源 (CSS/JS/assets)
@@ -81,6 +83,12 @@ async def import_page():
 @app.get("/chat")
 async def chat_page():
     """智能问答页面 — SPA 路由回退"""
+    return FileResponse(str(FRONTEND_DIST / "index.html"))
+
+
+@app.get("/documents")
+async def documents_page():
+    """文档预览页面 — SPA 路由回退"""
     return FileResponse(str(FRONTEND_DIST / "index.html"))
 
 

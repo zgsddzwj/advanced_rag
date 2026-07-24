@@ -13,6 +13,7 @@ from app.core.logger import logger
 class SSEEvent(Enum):
     """SSE 事件类型"""
     READY = "ready"
+    THINKING = "thinking"
     PROGRESS = "progress"
     DELTA = "delta"
     FINAL = "final"

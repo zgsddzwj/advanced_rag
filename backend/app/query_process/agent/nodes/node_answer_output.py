@@ -19,6 +19,7 @@ from app.lm.lm_utils import get_llm_client
 from app.clients.mongo_history_utils import save_chat_message
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.sse_utils import push_to_session, SSEEvent
+from app.utils.thinking_utils import push_thinking_start
 
 # 参考内容每个切片最大长度
 MAX_CHUNK_CONTENT_LEN = 800
@@ -34,6 +35,7 @@ def node_answer_output(state: QueryGraphState) -> QueryGraphState:
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
     add_running_task(state["task_id"], func_name, is_stream)
+    push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
         reranked_docs = state.get("reranked_docs", [])

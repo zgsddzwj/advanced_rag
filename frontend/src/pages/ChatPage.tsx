@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Plus, MessageCircle } from 'lucide-react'
 import { ask, listenStream, getHistory, clearHistory } from '@/api/client'
-import type { ChatMessage } from '@/types'
+import type { ChatMessage, SSEThinkingData } from '@/types'
 import MessageBubble from '@/components/MessageBubble'
 import TypingIndicator from '@/components/TypingIndicator'
+import ThinkingProcess from '@/components/ThinkingProcess'
 
 const SUGGESTIONS = [
   '这个产品的使用方法是什么？',
@@ -55,6 +56,9 @@ export default function ChatPage() {
     setShowTyping(true)
     setInput('')
 
+    // 重置思考过程
+    window.dispatchEvent(new CustomEvent('thinking-reset'))
+
     // 添加用户消息
     setMessages(prev => [...prev, { role: 'user', text: q }])
 
@@ -66,6 +70,10 @@ export default function ChatPage() {
       // SSE 流式接收
       let accText = ''
       listenStream(data.task_id, {
+        onThinking(d: SSEThinkingData) {
+          setShowTyping(false)
+          window.dispatchEvent(new CustomEvent('thinking-step', { detail: d }))
+        },
         onDelta(d) {
           setShowTyping(false)
           accText += d.text
@@ -74,6 +82,8 @@ export default function ChatPage() {
         onFinal(d) {
           setShowTyping(false)
           setStreamingText('')
+          // 延迟清除思考过程
+          setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
           setMessages(prev => [...prev, {
             role: 'assistant',
             text: d.answer || accText,
@@ -85,12 +95,14 @@ export default function ChatPage() {
         onError(d) {
           setShowTyping(false)
           setStreamingText('')
+          setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
           setMessages(prev => [...prev, { role: 'assistant', text: `⚠️ ${d.message || '生成回答时出现错误'}` }])
           setWaiting(false)
         },
       })
     } catch (e) {
       setShowTyping(false)
+      setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
       setMessages(prev => [...prev, { role: 'assistant', text: '⚠️ 网络错误，请稍后重试' }])
       setWaiting(false)
     }
@@ -148,6 +160,7 @@ export default function ChatPage() {
             {messages.map((msg, i) => (
               <MessageBubble key={i} msg={msg} />
             ))}
+            {(showTyping || waiting) && <ThinkingProcess />}
             {showTyping && <TypingIndicator />}
             {streamingText && (
               <MessageBubble msg={{ role: 'assistant', text: streamingText }} streaming />

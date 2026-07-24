@@ -7,6 +7,9 @@ import type {
   SSEDeltaData,
   SSEFinalData,
   SSEErrorData,
+  SSEThinkingData,
+  DocumentListResponse,
+  ChunkListResponse,
 } from '@/types'
 
 const API_BASE = '/api'
@@ -60,10 +63,25 @@ export async function healthCheck(): Promise<HealthResponse> {
   return resp.json()
 }
 
+// ==================== 文档预览 API ====================
+
+export async function getDocumentList(): Promise<DocumentListResponse> {
+  const resp = await fetch(`${API_BASE}/documents/list`)
+  if (!resp.ok) throw new Error(`获取文档列表失败: ${resp.status}`)
+  return resp.json()
+}
+
+export async function getDocumentChunks(fileTitle: string): Promise<ChunkListResponse> {
+  const resp = await fetch(`${API_BASE}/documents/chunks/${encodeURIComponent(fileTitle)}`)
+  if (!resp.ok) throw new Error(`获取切分详情失败: ${resp.status}`)
+  return resp.json()
+}
+
 // ==================== SSE 流式监听 ====================
 
 export interface SSEHandlers {
   onReady?: () => void
+  onThinking?: (data: SSEThinkingData) => void
   onDelta?: (data: SSEDeltaData) => void
   onFinal?: (data: SSEFinalData) => void
   onError?: (data: SSEErrorData) => void
@@ -74,6 +92,11 @@ export function listenStream(taskId: string, handlers: SSEHandlers): EventSource
 
   es.addEventListener('ready', () => {
     handlers.onReady?.()
+  })
+
+  es.addEventListener('thinking', (e) => {
+    const data: SSEThinkingData = JSON.parse(e.data)
+    handlers.onThinking?.(data)
   })
 
   es.addEventListener('delta', (e) => {

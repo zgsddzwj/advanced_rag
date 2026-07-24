@@ -1,11 +1,12 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Upload, MessageSquare, BookOpen, Activity } from 'lucide-react'
+import { LayoutDashboard, Upload, FileStack, MessageSquare, BookOpen, Activity } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { healthCheck } from '@/api/client'
 
 const navItems = [
   { to: '/', label: '系统首页', icon: LayoutDashboard },
   { to: '/import', label: '知识库导入', icon: Upload },
+  { to: '/documents', label: '文档预览', icon: FileStack },
   { to: '/chat', label: '智能问答', icon: MessageSquare },
 ]
 
