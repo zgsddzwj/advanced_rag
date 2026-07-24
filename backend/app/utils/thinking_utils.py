@@ -11,7 +11,7 @@ from app.core.logger import logger
 _THINKING_MESSAGES = {
     "node_item_name_confirm": {
         "start": "正在理解您的问题，并匹配相关的知识库文档...",
-        "detail": "商品名对齐",
+        "detail": "主题匹配",
     },
     "node_search_embedding": {
         "start": "正在从知识库中检索相关内容（向量 + BM25 混合搜索）...",

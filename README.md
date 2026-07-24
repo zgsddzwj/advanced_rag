@@ -209,17 +209,17 @@ cd frontend && npm run dev
 
 ```
 入口判断 → PDF转Markdown → 图片处理(VLM) → 文档切分
-    → 商品名识别(LLM) → 向量化(Embedding API) → 入库Milvus
+    → 主题识别(LLM) → 向量化(Embedding API) → 入库Milvus
 ```
 
 ### 查询流程（7 节点 LangGraph + SSE）
 
 ```
-商品名确认 → 向量检索 → HyDE检索 → (网络搜索?) → RRF融合 → Rerank重排 → 流式回答
+主题确认 → 向量检索 → HyDE检索 → (网络搜索?) → RRF融合 → Rerank重排 → 流式回答
 ```
 
-1. **商品名确认**：加载历史 → LLM 改写查询+提取商品名 → Milvus 向量对齐
-2. **向量检索**：Dense + BM25 混合检索（支持商品名过滤）
+1. **主题确认**：加载历史 → LLM 改写查询+提取文档主题 → Milvus 向量对齐
+2. **向量检索**：Dense + BM25 混合检索（支持主题过滤）
 3. **HyDE检索**：LLM 生成假设性回答 → 向量化 → 混合检索
 4. **网络搜索**：结果不足时调用百炼 MCP 联网搜索
 5. **RRF融合**：三路结果 Reciprocal Rank Fusion 融合排序

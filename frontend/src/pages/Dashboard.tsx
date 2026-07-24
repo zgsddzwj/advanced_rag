@@ -9,7 +9,7 @@ const stats = [
 ]
 
 const pipelineSteps = [
-  '商品名确认', '向量检索', 'HyDE 检索', '网络搜索', 'RRF 融合', 'Rerank 重排', '流式回答',
+  '主题确认', '向量检索', 'HyDE 检索', '网络搜索', 'RRF 融合', 'Rerank 重排', '流式回答',
 ]
 
 export default function Dashboard() {
@@ -54,7 +54,7 @@ export default function Dashboard() {
           </div>
           <h3 className="text-lg font-semibold mb-2">知识库导入</h3>
           <p className="text-sm text-gray-500 leading-relaxed">
-            上传 PDF 或 Markdown 文档，系统自动完成 PDF 解析、图片 VLM 描述、文档切分、商品名识别、向量化并存入 Milvus 向量数据库。
+            上传 PDF 或 Markdown 文档，系统自动完成 PDF 解析、图片 VLM 描述、文档切分、主题识别、向量化并存入 Milvus 向量数据库。
           </p>
           <div className="mt-4 text-sm text-indigo-600 font-medium flex items-center gap-1">
             前往导入 <Zap size={14} />

@@ -45,7 +45,7 @@ export default function MessageBubble({ msg, streaming }: { msg: ChatMessage; st
           </div>
         )}
 
-        {/* 商品名标签 */}
+        {/* 文档主题标签 */}
         {msg.item_names && msg.item_names.length > 0 && (
           <div className={`mt-3 pt-3 border-t flex items-center gap-2 flex-wrap ${isUser ? 'border-white/20' : 'border-gray-100'}`}>
             <Tag size={14} className={isUser ? 'text-white/60' : 'text-gray-400'} />

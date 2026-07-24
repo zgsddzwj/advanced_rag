@@ -107,7 +107,7 @@ export const IMPORT_NODES: ImportNode[] = [
   { id: 'node_pdf_to_md', label: 'PDF转Markdown', icon: 'FileText' },
   { id: 'node_md_img', label: '图片处理', icon: 'Image' },
   { id: 'node_document_split', label: '文档切分', icon: 'Scissors' },
-  { id: 'node_item_name_recognition', label: '商品名识别', icon: 'Tag' },
+  { id: 'node_item_name_recognition', label: '主题识别', icon: 'Tag' },
   { id: 'node_bge_embedding', label: '向量化', icon: 'Hash' },
   { id: 'node_import_milvus', label: '入库Milvus', icon: 'Database' },
 ]

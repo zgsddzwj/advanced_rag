@@ -1,8 +1,8 @@
 """
-商品名确认节点（节点1）
+文档主题确认节点（节点1）
 1. 加载对话历史
-2. LLM 改写查询 + 提取商品名
-3. 商品名向量对齐（Milvus kb_item_names）
+2. LLM 改写查询 + 提取文档主题
+3. 主题向量对齐（Milvus kb_item_names）
 4. 用户消息写入 MongoDB
 """
 import sys
@@ -22,14 +22,14 @@ from app.conf.milvus_config import milvus_config
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start, push_thinking_done
 
-# 商品名对齐相似度阈值
+# 主题对齐相似度阈值
 ITEM_NAME_MATCH_THRESHOLD = 0.65
 # 历史对话最大轮数
 HISTORY_MAX_MESSAGES = 10
 
 
 def node_item_name_confirm(state: QueryGraphState) -> QueryGraphState:
-    """商品名确认节点：改写查询 + 商品名对齐 + 历史写入"""
+    """文档主题确认节点：改写查询 + 主题对齐 + 历史写入"""
     func_name = sys._getframe().f_code.co_name
     logger.info(f">>> 执行节点: {func_name}")
     is_stream = state.get("is_stream", False)
@@ -40,10 +40,10 @@ def node_item_name_confirm(state: QueryGraphState) -> QueryGraphState:
         # Step 1: 加载对话历史
         history = _load_history(state)
 
-        # Step 2: LLM 改写查询 + 提取商品名
+        # Step 2: LLM 改写查询 + 提取文档主题
         rewritten_query, item_names = _rewrite_and_extract(state, history)
 
-        # Step 3: 商品名向量对齐
+        # Step 3: 文档主题向量对齐
         aligned_item_names = _align_item_names(item_names)
 
         # Step 4: 用户消息写入 MongoDB
@@ -55,10 +55,10 @@ def node_item_name_confirm(state: QueryGraphState) -> QueryGraphState:
         state["history"] = history
 
         logger.info(f"改写查询: {rewritten_query}")
-        logger.info(f"对齐商品名: {aligned_item_names}")
+        logger.info(f"对齐文档主题: {aligned_item_names}")
 
     except Exception as e:
-        logger.error(f"商品名确认失败: {str(e)}", exc_info=True)
+        logger.error(f"文档主题确认失败: {str(e)}", exc_info=True)
         state["rewritten_query"] = state.get("query", "")
         state["item_names"] = []
     finally:
@@ -101,7 +101,7 @@ def _format_history(history: List[Dict[str, Any]]) -> str:
 def _rewrite_and_extract(
     state: QueryGraphState, history: List[Dict[str, Any]]
 ) -> Tuple[str, List[str]]:
-    """调用 LLM 改写查询并提取商品名"""
+    """调用 LLM 改写查询并提取文档主题"""
     query = state.get("query", "")
     if not query:
         return "", []
@@ -112,7 +112,7 @@ def _rewrite_and_extract(
 
         llm = get_llm_client()
         messages = [
-            SystemMessage(content="你是一个智能助手，负责查询改写和商品名提取。"),
+            SystemMessage(content="你是一个智能助手，负责查询改写和文档主题提取。"),
             HumanMessage(content=prompt),
         ]
         resp = llm.invoke(messages)
@@ -128,16 +128,16 @@ def _rewrite_and_extract(
 
 
 def _parse_llm_response(content: str, fallback_query: str) -> Tuple[str, List[str]]:
-    """解析 LLM 返回的产品名称和改写问题"""
+    """解析 LLM 返回的文档主题和改写问题"""
     rewritten_query = fallback_query
     item_names = []
 
     try:
-        # 提取产品名称
-        item_match = re.search(r"产品名称[：:]\s*(.+)", content)
+        # 提取文档主题
+        item_match = re.search(r"文档主题[：:]\s*(.+)", content)
         if item_match:
             names_str = item_match.group(1).strip()
-            # 支持逗号、顿号分隔多个商品名
+            # 支持逗号、顿号分隔多个主题
             item_names = [
                 name.strip()
                 for name in re.split(r"[,，、；;]", names_str)
@@ -156,7 +156,7 @@ def _parse_llm_response(content: str, fallback_query: str) -> Tuple[str, List[st
 
 
 def _align_item_names(item_names: List[str]) -> List[str]:
-    """商品名向量对齐：在 Milvus kb_item_names 中查找最匹配的商品名"""
+    """文档主题向量对齐：在 Milvus kb_item_names 中查找最匹配的文档主题"""
     if not item_names:
         return []
 
@@ -168,13 +168,13 @@ def _align_item_names(item_names: List[str]) -> List[str]:
 
         # 集合不存在则跳过对齐
         if not client.has_collection(collection_name=collection_name):
-            logger.warning(f"集合 {collection_name} 不存在，跳过商品名对齐")
+            logger.warning(f"集合 {collection_name} 不存在，跳过文档主题对齐")
             return item_names
 
         client.load_collection(collection_name=collection_name)
 
-        for name in item_names:
-            # 生成商品名向量
+            for name in item_names:
+            # 生成文档主题向量
             dense_vector = generate_embedding(name)
 
             # 在 kb_item_names 中搜索
@@ -192,16 +192,16 @@ def _align_item_names(item_names: List[str]) -> List[str]:
                 matched_name = top_hit.get("entity", {}).get("item_name", "")
 
                 if score >= ITEM_NAME_MATCH_THRESHOLD and matched_name:
-                    logger.info(f"商品名对齐: '{name}' → '{matched_name}' (score={score:.4f})")
+                    logger.info(f"文档主题对齐: '{name}' → '{matched_name}' (score={score:.4f})")
                     aligned.append(matched_name)
                 else:
-                    logger.info(f"商品名未对齐: '{name}' (最近匹配 score={score:.4f})")
+                    logger.info(f"文档主题未对齐: '{name}' (最近匹配 score={score:.4f})")
                     aligned.append(name)
             else:
                 aligned.append(name)
 
     except Exception as e:
-        logger.error(f"商品名对齐失败: {e}")
+        logger.error(f"文档主题对齐失败: {e}")
         return item_names
 
     return aligned

@@ -76,7 +76,7 @@ def create_chunks_collection(client: MilvusClient, collection_name: str, vector_
 
 def create_item_names_collection(client: MilvusClient, collection_name: str, vector_dimension: int):
     """
-    创建 kb_item_names 集合（文档级索引，商品名对齐用）
+    创建 kb_item_names 集合（文档级索引，文档主题对齐用）
     """
     schema = client.create_schema(auto_id=True, enable_dynamic_fields=True)
     schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True, auto_id=True)

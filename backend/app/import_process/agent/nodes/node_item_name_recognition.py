@@ -1,6 +1,6 @@
 """
-商品名识别节点
-利用LLM从文档切片中提取商品/设备名称，生成稠密向量存入Milvus
+文档主题识别节点
+利用LLM从文档切片中提取文档主题/关键词，生成稠密向量存入Milvus
 """
 import os
 import sys
@@ -24,7 +24,7 @@ CONTEXT_TOTAL_MAX_CHARS = 2500
 
 
 def node_item_name_recognition(state: ImportGraphState) -> ImportGraphState:
-    """商品主体名称识别节点"""
+    """文档主题识别节点"""
     func_name = sys._getframe().f_code.co_name
     logger.info(f">>> 执行节点: {func_name}")
     add_running_task(state["task_id"], func_name)
@@ -40,11 +40,11 @@ def node_item_name_recognition(state: ImportGraphState) -> ImportGraphState:
         _step_4_update_chunks(state, chunks, item_name)
         _step_5_save_to_milvus(state, file_title, item_name)
 
-        logger.info(f"商品名称识别完成: {item_name}")
+        logger.info(f"文档主题识别完成: {item_name}")
 
     except Exception as e:
-        logger.error(f"商品名称识别失败: {str(e)}", exc_info=True)
-        state["item_name"] = state.get("file_title", "未知商品")
+        logger.error(f"文档主题识别失败: {str(e)}", exc_info=True)
+        state["item_name"] = state.get("file_title", "未知主题")
     finally:
         add_done_task(state["task_id"], func_name)
 
@@ -98,15 +98,15 @@ def _step_2_build_context(chunks: List[Dict], k: int = DEFAULT_ITEM_NAME_CHUNK_K
 
 
 def _step_3_call_llm(file_title: str, context: str) -> str:
-    """调用LLM识别商品名称"""
+    """调用LLM识别文档主题"""
     if not context:
         return file_title
 
     try:
         llm = get_llm_client()
 
-        system_prompt = "你是一个商品识别专家。请从用户提供的文档内容中，精准识别出该文档描述的商品或设备名称。仅返回纯文本的商品名称，不要有任何额外解释。"
-        human_prompt = f"文件标题：{file_title}\n\n文档内容：\n{context}\n\n请识别这个文档描述的商品/设备名称："
+        system_prompt = "你是一个文档分析专家。请从用户提供的文档内容中，精准识别出该文档主要描述的主题或关键词。仅返回纯文本的主题名称，不要有任何额外解释。"
+        human_prompt = f"文件标题：{file_title}\n\n文档内容：\n{context}\n\n请识别这个文档的主题或关键词："
 
         messages = [
             SystemMessage(content=system_prompt),
@@ -119,7 +119,7 @@ def _step_3_call_llm(file_title: str, context: str) -> str:
         if not item_name:
             return file_title
 
-        logger.info(f"LLM识别商品名称: {item_name}")
+        logger.info(f"LLM识别文档主题: {item_name}")
         return item_name
 
     except Exception as e:
@@ -128,16 +128,16 @@ def _step_3_call_llm(file_title: str, context: str) -> str:
 
 
 def _step_4_update_chunks(state: ImportGraphState, chunks: List[Dict], item_name: str):
-    """回填商品名称到状态和切片"""
+    """回填文档主题到状态和切片"""
     state["item_name"] = item_name
     for chunk in chunks:
         chunk["item_name"] = item_name
     state["chunks"] = chunks
-    logger.info(f"商品名称回填完成: {item_name}")
+    logger.info(f"文档主题回填完成: {item_name}")
 
 
 def _step_5_save_to_milvus(state: ImportGraphState, file_title: str, item_name: str):
-    """将商品名称及稠密向量保存到Milvus"""
+    """将文档主题及稠密向量保存到Milvus"""
     collection_name = milvus_config.ITEM_NAMES_COLLECTION
 
     try:
@@ -166,7 +166,7 @@ def _step_5_save_to_milvus(state: ImportGraphState, file_title: str, item_name: 
 
         client.insert(collection_name=collection_name, data=[data])
         client.load_collection(collection_name=collection_name)
-        logger.info(f"商品名称存入Milvus成功: {item_name}")
+        logger.info(f"文档主题存入Milvus成功: {item_name}")
 
     except Exception as e:
-        logger.error(f"商品名称存入Milvus失败: {str(e)}", exc_info=True)
+        logger.error(f"文档主题存入Milvus失败: {str(e)}", exc_info=True)

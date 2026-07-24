@@ -17,7 +17,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 async def list_documents():
     """
     获取所有已导入的文档列表
-    按 file_title 聚合，返回每个文档的切片数、商品名等信息
+    按 file_title 聚合，返回每个文档的切片数、文档主题等信息
     """
     try:
         client = get_milvus_client()
@@ -67,7 +67,7 @@ async def list_documents():
 async def get_document_chunks(file_title: str, limit: int = Query(500, ge=1, le=1000)):
     """
     获取指定文档的切分详情
-    返回所有切片的标题、内容、商品名等信息
+    返回所有切片的标题、内容、文档主题等信息
     """
     try:
         client = get_milvus_client()

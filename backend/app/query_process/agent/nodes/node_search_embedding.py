@@ -55,7 +55,7 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
         dense_vector = generate_embedding(query)
         logger.info(f"查询向量化完成，维度: {len(dense_vector)}")
 
-        # Step 2: 构造过滤表达式（基于商品名）
+        # Step 2: 构造过滤表达式（基于文档主题）
         expr = _build_filter_expr(state.get("item_names", []))
 
         # Step 3: 构造混合搜索请求

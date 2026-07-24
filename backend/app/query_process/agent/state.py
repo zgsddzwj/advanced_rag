@@ -15,7 +15,7 @@ class QueryGraphState(TypedDict):
     # 对话历史
     history: list
 
-    # 商品名对齐
+    # 文档主题对齐
     item_names: List[str]
 
     # 检索结果 —— 各路独立

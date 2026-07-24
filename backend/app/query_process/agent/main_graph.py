@@ -28,7 +28,7 @@ workflow.set_entry_point("node_item_name_confirm")
 
 
 def route_after_item_name(state: QueryGraphState) -> str:
-    """商品名确认后路由：始终走向量检索"""
+    """文档主题确认后路由：始终走向量检索"""
     return "node_search_embedding"
 
 
