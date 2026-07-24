@@ -19,21 +19,30 @@ def get_embedding_client() -> OpenAIEmbeddings:
             api_key=lm_config.DASHSCOPE_API_KEY,
             base_url=lm_config.EMBEDDING_BASE_URL,
             dimensions=lm_config.EMBEDDING_DIM,
+            check_embedding_ctx_length=False,
         )
         logger.info(f"Embedding 客户端初始化成功: {lm_config.EMBEDDING_MODEL}")
     return _embedding_client
 
 
+# DashScope text-embedding-v3 单次批量上限
+EMBEDDING_BATCH_SIZE = 10
+
+
 def generate_embeddings(texts: List[str]) -> List[List[float]]:
     """
-    批量生成稠密向量
+    批量生成稠密向量（自动分批，每批不超过10条）
     :param texts: 文本列表
     :return: 向量列表（每个元素为 1024 维浮点列表）
     """
     client = get_embedding_client()
-    vectors = client.embed_documents(texts)
-    logger.info(f"Embedding 生成完成: {len(texts)} 条文本 → {len(vectors)} 个向量")
-    return vectors
+    all_vectors = []
+    for i in range(0, len(texts), EMBEDDING_BATCH_SIZE):
+        batch = texts[i:i + EMBEDDING_BATCH_SIZE]
+        batch_vectors = client.embed_documents(batch)
+        all_vectors.extend(batch_vectors)
+    logger.info(f"Embedding 生成完成: {len(texts)} 条文本 → {len(all_vectors)} 个向量")
+    return all_vectors
 
 
 def generate_embedding(text: str) -> List[float]:

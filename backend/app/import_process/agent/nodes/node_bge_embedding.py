@@ -11,8 +11,8 @@ from app.utils.task_utils import add_running_task, add_done_task
 from app.lm.embedding_utils import generate_embeddings
 from app.core.logger import logger
 
-# 批量大小：API 单次调用上限
-BATCH_SIZE = 25
+# 批量大小：DashScope text-embedding-v3 单次调用上限为 10
+BATCH_SIZE = 10
 
 
 def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
