@@ -14,20 +14,30 @@ NexusRAG 是一套完整的检索增强生成（RAG）系统，包含**文档导
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
 │  │  React 前端   │  │  导入 API     │  │   查询 API     │ │
 │  │  (Vite 构建)  │  │ /api/import/* │  │  /api/query/*  │ │
-│  │  / /import    │  │               │  │  + SSE 流式    │ │
+│  │  / /import    │  │ /api/documents│  │  + SSE 流式    │ │
 │  │  /chat        │  └───────┬──────┘  └───────┬───────┘ │
 │  └──────────────┘          │                 │          │
 │  ┌─────────────────────────▼─────────────────▼────────┐ │
-│  │         导入 LangGraph (7节点) / 检索 LangGraph     │ │
-│  └───────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
+│  │     导入 LangGraph (7节点) / 检索 LangGraph        │ │
+│  │          + Kafka Producer (事件发布)               │ │
+│  └───────────────────────────┬────────────────────────┘ │
+└──────────────────────────────┼──────────────────────────┘
+                               │
+  ┌────────────────────────────▼──────────────────────────┐
+  │              Kafka (document-events)                   │
+  │          + Kafka Consumer (后台常驻)                   │
+  │   ADD→全量导入  UPDATE→删旧+重导  DELETE→清除          │
+  └───────────────────────────┬──────────────────────────┘
             │                          │
   ┌─────────▼──────────────────────────▼──────────────┐
   │              基础设施层 (Docker Compose)            │
   │  ┌────────┐  ┌────────┐  ┌─────────┐  ┌────────┐ │
-  │  │ Milvus │  │ MinIO  │  │ MongoDB │  │  etcd  │ │
+  │  │ Milvus │  │ MinIO  │  │ MongoDB │  │ Kafka  │ │
   │  └────────┘  └────────┘  └─────────┘  └────────┘ │
-  └───────────────────────────────────────────────────┘
+  │  ┌────────┐                                     │
+  │  │  etcd  │                                     │
+  │  └────────┘                                     │
+  └─────────────────────────────────────────────────┘
             │                          │
   ┌─────────▼──────────────────────────▼──────────────┐
   │           阿里云百炼 API (DashScope)               │
@@ -45,6 +55,7 @@ NexusRAG 是一套完整的检索增强生成（RAG）系统，包含**文档导
 | **前端渲染** | react-markdown + remark-gfm + rehype-highlight (代码高亮) |
 | **后端** | FastAPI + SSE 流式输出 + LangGraph |
 | **向量数据库** | Milvus 2.5（Dense + BM25 混合检索） |
+| **消息队列** | Apache Kafka 3.7 (KRaft) — 文档事件驱动同步 |
 | **文件存储** | MinIO |
 | **对话历史** | MongoDB |
 | **AI 模型** | 阿里云百炼（Qwen-Plus / Qwen-VL-Plus / text-embedding-v3 / gte-rerank） |
@@ -97,6 +108,7 @@ advanced_rag/
 │   │   ├── conf/                        #   配置层
 │   │   │   ├── lm_config.py             #     AI 模型配置
 │   │   │   ├── milvus_config.py         #     Milvus 配置
+│   │   │   ├── kafka_config.py          #     Kafka 配置
 │   │   │   ├── bailian_mcp_config.py    #     百炼 MCP 配置
 │   │   │   └── mineru_config.py         #     MinerU 配置
 │   │   ├── lm/                          #   AI 模型封装层
@@ -108,7 +120,10 @@ advanced_rag/
 │   │   ├── clients/                     #   基础设施客户端
 │   │   │   ├── milvus_utils.py          #     Milvus 连接 + 混合搜索
 │   │   │   ├── minio_utils.py           #     MinIO 文件操作
-│   │   │   └── mongo_history_utils.py   #     MongoDB 对话历史
+│   │   │   ├── mongo_history_utils.py   #     MongoDB 对话历史
+│   │   │   ├── document_meta_utils.py   #     文档元数据管理 (content_hash)
+│   │   │   ├── kafka_producer.py        #     Kafka 生产者 (事件发布)
+│   │   │   └── kafka_consumer.py        #     Kafka 消费者 (增量同步)
 │   │   ├── utils/                       #   通用工具
 │   │   │   ├── task_utils.py            #     任务状态管理
 │   │   │   ├── sse_utils.py             #     SSE 事件队列
@@ -120,7 +135,10 @@ advanced_rag/
 │   │   │   │   ├── state.py             #     ImportGraphState
 │   │   │   │   ├── main_graph.py        #     导入图编排 (7 节点)
 │   │   │   │   └── nodes/               #     7 个节点实现
-│   │   │   └── api/file_import_service.py
+│   │   │   └── api/
+│   │   │       ├── file_import_service.py      # 文件上传导入
+│   │   │       ├── document_preview_service.py # 文档列表/切片预览
+│   │   │       └── document_event_service.py   # 文档删除/重导入(Kafka)
 │   │   └── query_process/               #   查询流程
 │   │       ├── agent/
 │   │       │   ├── state.py             #     QueryGraphState
@@ -170,10 +188,11 @@ cp .env.example backend/.env
 docker compose up -d
 ```
 
-启动后包含 4 个服务：
+启动后包含 5 个服务：
 - **Milvus** — 向量数据库 (:19530)
 - **MinIO** — 文件存储 (:9000, 控制台 :9001)
-- **MongoDB** — 对话历史 (:27017)
+- **MongoDB** — 对话历史 + 文档元数据 (:27017)
+- **Kafka** — 消息队列，文档事件驱动 (:29092)
 - **etcd** — Milvus 依赖服务 (:2379)
 
 ### 4. 构建前端
@@ -269,6 +288,39 @@ cd frontend && npm run dev
 |------|------|------|
 | GET | `/api/documents/list` | 获取已导入文档列表 |
 | GET | `/api/documents/chunks/{file_title}` | 获取文档切分详情 |
+| GET | `/api/documents/meta/list` | 获取文档元数据（含同步状态） |
+
+### 文档事件 API (Kafka 驱动)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| DELETE | `/api/documents/{file_title}` | 删除文档（发布 DELETE 事件，异步清除 chunks） |
+| POST | `/api/documents/reimport/{file_title}` | 重新导入文档（发布 UPDATE 事件，删旧 chunks 后重导） |
+
+## Kafka 文档事件同步
+
+系统通过 Kafka 实现文档变更的实时监听和 chunks 增量更新：
+
+### 事件类型
+
+| 事件类型 | 触发场景 | 消费者处理 |
+|---------|---------|-----------|
+| `DOCUMENT_ADD` | 新文档导入完成 | 触发完整 LangGraph 导入流程 → 入库 Milvus |
+| `DOCUMENT_UPDATE` | 同标题文档内容变更 | 先删 Milvus 旧 chunks → 重新导入 |
+| `DOCUMENT_DELETE` | 调用删除 API | 删除 Milvus chunks + item_names + 元数据 |
+
+### 工作流程
+
+1. 文档上传 → LangGraph 导入 → 计算内容哈希 → 与 MongoDB 元数据比对
+2. 判断事件类型（ADD/UPDATE）→ 发布到 Kafka `document-events` topic
+3. Kafka 消费者后台常驻监听，收到事件后异步处理
+4. 更新 Milvus chunks + MongoDB 元数据
+
+### 降级机制
+
+- Kafka 不可用时，导入流程正常完成，仅跳过事件发布（降级为日志告警）
+- 消费者处理失败自动重试 3 次，失败后记录死信日志
+- 设置 `KAFKA_ENABLED=false` 可完全关闭 Kafka 功能
 
 ## 测试
 
@@ -300,6 +352,7 @@ uv run python test/04_e2e_integration_test.py
 | **基础设施** | Docker Compose 一键编排（Milvus + MinIO + MongoDB + etcd） |
 | **配置管理** | .env 环境变量 + 启动时自动校验 |
 | **文档预览** | 支持查看已导入文档列表及切分详情 |
+| **消息队列** | Kafka 事件驱动，文档变更实时同步 chunks |
 | **结构测试** | 导入图/检索图/端到端集成测试（10 项验证） |
 
 ### ⚠️ 距离生产级还需补齐
@@ -308,7 +361,7 @@ uv run python test/04_e2e_integration_test.py
 |------|------|------|
 | **认证鉴权** | 无认证，API 完全开放 | 添加 JWT / API Key 认证中间件 |
 | **限流防护** | 无限流 | 添加 rate limiter（如 slowapi） |
-| **任务队列** | threading + BackgroundTasks | 迁移至 Celery / ARQ 异步任务队列 |
+| **任务队列** | ~~threading + BackgroundTasks~~ Kafka 事件驱动 + 后台消费者 |
 | **监控告警** | 仅 loguru 本地日志 | 接入 Prometheus + Grafana 指标监控 |
 | **CI/CD** | 无自动化流水线 | 搭建 GitHub Actions 自动测试 + 部署 |
 | **HTTPS** | 仅 HTTP | 配置 Nginx 反向代理 + TLS 证书 |

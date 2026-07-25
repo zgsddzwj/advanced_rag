@@ -1,8 +1,10 @@
 """
 导入服务 FastAPI 路由
 提供文件上传和导入流程触发的 REST API
+导入完成后自动发布 Kafka 事件，驱动文档元数据同步
 """
 import os
+import asyncio
 import uuid
 from pathlib import Path
 
@@ -13,6 +15,8 @@ from app.utils.path_util import PROJECT_ROOT
 from app.utils.task_utils import update_task_status, get_task_status, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
 from app.import_process.agent.main_graph import kb_import_app
 from app.import_process.agent.state import create_default_state
+from app.clients.document_meta_utils import compute_content_hash, get_metadata, upsert_metadata
+from app.clients.kafka_producer import publish_document_event
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -65,7 +69,7 @@ async def get_import_status(task_id: str):
 
 
 def _run_import(task_id: str, file_path: str, output_dir: str):
-    """后台执行导入流程"""
+    """后台执行导入流程，完成后保存元数据并发布 Kafka 事件"""
     update_task_status(task_id, TASK_STATUS_PROCESSING)
 
     try:
@@ -78,8 +82,44 @@ def _run_import(task_id: str, file_path: str, output_dir: str):
         # 同步执行 LangGraph 流程
         result = kb_import_app.invoke(initial_state)
 
+        # 提取导入结果
+        chunks = result.get("chunks", [])
+        item_name = result.get("item_name", "")
+        file_title = result.get("file_title", "")
+        chunk_count = len(chunks)
+
+        # 保存文档元数据到 MongoDB
+        content_hash = compute_content_hash(file_path)
+        old_meta = upsert_metadata(
+            file_title=file_title,
+            content_hash=content_hash,
+            chunk_count=chunk_count,
+            item_name=item_name,
+            file_path=file_path,
+        )
+
+        # 判断事件类型：有旧记录且哈希不同 → UPDATE，否则 → ADD
+        old_hash = old_meta.get("content_hash", "") if old_meta else ""
+        event_type = "DOCUMENT_UPDATE" if old_hash and old_hash != content_hash else "DOCUMENT_ADD"
+
+        # 发布 Kafka 事件（同步函数中创建事件循环）
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(publish_document_event(
+                event_type=event_type,
+                file_title=file_title,
+                file_path=file_path,
+                content_hash=content_hash,
+                chunk_count=chunk_count,
+                item_name=item_name,
+            ))
+            loop.close()
+        except Exception as e:
+            logger.warning(f"Kafka 事件发布失败（不影响导入结果）: {e}")
+
         update_task_status(task_id, TASK_STATUS_COMPLETED)
-        logger.info(f"导入流程完成，task_id: {task_id}")
+        logger.info(f"导入流程完成，task_id: {task_id}, chunks: {chunk_count}, event: {event_type}")
 
     except Exception as e:
         logger.error(f"导入流程失败，task_id: {task_id}，错误: {str(e)}", exc_info=True)

@@ -13,9 +13,13 @@ from app.core.logger import logger
 from app.conf.lm_config import lm_config
 from app.conf.mineru_config import mineru_config
 from app.conf.bailian_mcp_config import bailian_mcp_config
+from app.conf.kafka_config import kafka_config
 from app.import_process.api.file_import_service import router as import_router
 from app.import_process.api.document_preview_service import router as document_router
+from app.import_process.api.document_event_service import router as document_event_router
 from app.query_process.api.query_service import router as query_router
+from app.clients.kafka_consumer import start_kafka_consumer, stop_kafka_consumer
+from app.clients.kafka_producer import close_producer
 
 # 前端构建产物目录（frontend/dist/）
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -50,15 +54,28 @@ async def lifespan(app: FastAPI):
     else:
         logger.info(f"百炼 MCP App ID 已配置: {mcp_app_id}")
 
+    # 校验 Kafka 配置
+    if kafka_config.ENABLED:
+        logger.info(f"Kafka 已启用: brokers={kafka_config.BOOTSTRAP_SERVERS}, topic={kafka_config.TOPIC}")
+        # 启动 Kafka 消费者
+        await start_kafka_consumer()
+    else:
+        logger.info("Kafka 未启用，文档事件同步功能不可用")
+
     yield
     logger.info("===== NexusRAG 服务关闭 =====")
 
+    # 停止 Kafka 消费者和生产者
+    await stop_kafka_consumer()
+    await close_producer()
 
-app = FastAPI(title="Advanced RAG", lifespan=lifespan)
+
+app = FastAPI(title="NexusRAG", lifespan=lifespan)
 
 # 注册后端 API 路由
 app.include_router(import_router, prefix="/api")
 app.include_router(document_router, prefix="/api")
+app.include_router(document_event_router, prefix="/api")
 app.include_router(query_router, prefix="/api")
 
 # 挂载前端静态资源 (CSS/JS/assets)
