@@ -5,10 +5,10 @@ MD文件图片处理节点
 import os
 import re
 import sys
-import time
 import base64
 from pathlib import Path
 from typing import Dict, List, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from app.clients.minio_utils import get_minio_client, upload_file
 from app.import_process.agent.state import ImportGraphState
@@ -141,29 +141,54 @@ def _summarize_image(image_path: str, root_folder: str, image_content: Tuple[str
         return "图片描述"
 
 
+# VLM 并发处理的最大线程数
+VLM_MAX_WORKERS = 3
+# MinIO 上传并发线程数
+UPLOAD_MAX_WORKERS = 5
+
+
 def _step_3_generate_summaries(doc_stem: str, targets: List[Tuple[str, str, Tuple[str, str]]]) -> Dict[str, str]:
-    """批量为待处理图片生成内容摘要"""
+    """并发批量为待处理图片生成内容摘要"""
     summaries = {}
-    for img_file, image_path, context in targets:
-        time.sleep(0.5)  # 简单限速，避免API限流
-        summaries[img_file] = _summarize_image(image_path, root_folder=doc_stem, image_content=context)
+    with ThreadPoolExecutor(max_workers=VLM_MAX_WORKERS) as executor:
+        future_to_img = {
+            executor.submit(_summarize_image, img_path, doc_stem, context): img_file
+            for img_file, img_path, context in targets
+        }
+        for future in as_completed(future_to_img):
+            img_file = future_to_img[future]
+            try:
+                summaries[img_file] = future.result()
+            except Exception as e:
+                logger.error(f"图片摘要生成异常: {img_file}，错误: {str(e)}")
+                summaries[img_file] = "图片描述"
     logger.info(f"图片摘要批量生成完成，共处理 {len(summaries)} 张图片")
     return summaries
 
 
 def _step_4_upload_and_replace(doc_stem: str, targets, summaries: Dict[str, str], md_content: str) -> str:
-    """上传图片至MinIO，替换MD图片路径"""
+    """并发上传图片至MinIO，替换MD图片路径"""
     upload_dir = f"{minio_config.IMG_DIR}/{doc_stem}".replace(" ", "")
 
-    # 上传图片并获取URL映射
+    # 并发上传图片并获取URL映射
     urls = {}
-    for img_file, img_path, _ in targets:
+    def _upload_single(img_file: str, img_path: str) -> Tuple[str, str]:
         object_name = f"{upload_dir}/{img_file}"
-        try:
-            img_url = upload_file(img_path, object_name, f"image/{os.path.splitext(img_file)[1][1:]}")
-            urls[img_file] = img_url
-        except Exception as e:
-            logger.error(f"图片上传MinIO失败: {img_file}，错误: {str(e)}")
+        content_type = f"image/{os.path.splitext(img_file)[1][1:]}"
+        img_url = upload_file(img_path, object_name, content_type)
+        return img_file, img_url
+
+    with ThreadPoolExecutor(max_workers=UPLOAD_MAX_WORKERS) as executor:
+        futures = [
+            executor.submit(_upload_single, img_file, img_path)
+            for img_file, img_path, _ in targets
+        ]
+        for future in as_completed(futures):
+            try:
+                img_file, img_url = future.result()
+                urls[img_file] = img_url
+            except Exception as e:
+                logger.error(f"图片上传MinIO失败: {str(e)}")
 
     # 合并摘要和URL
     image_info = {}

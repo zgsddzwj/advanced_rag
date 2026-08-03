@@ -6,8 +6,10 @@ from typing import List, Dict, Any
 import dashscope
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
+from app.utils.retry_utils import with_retry
 
 
+@with_retry(max_retries=2, base_delay=1.0)
 def rerank_documents(
     query: str,
     documents: List[Dict[str, Any]],

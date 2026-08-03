@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
+from app.utils.retry_utils import with_retry
 
 _vlm_client = None
 
@@ -24,6 +25,7 @@ def get_vlm_client() -> ChatOpenAI:
     return _vlm_client
 
 
+@with_retry(max_retries=2, base_delay=1.0)
 def describe_image(image_url: str) -> str:
     """
     调用 VLM 对图片进行语义描述

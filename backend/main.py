@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
@@ -71,6 +72,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="NexusRAG", lifespan=lifespan)
+
+# CORS 中间件：允许开发模式下 Vite 开发服务器跨域访问
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # 注册后端 API 路由
 app.include_router(import_router, prefix="/api")

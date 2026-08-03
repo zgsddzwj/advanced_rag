@@ -6,8 +6,10 @@ from typing import List, Dict, Any
 import dashscope
 from app.core.logger import logger
 from app.conf.bailian_mcp_config import bailian_mcp_config
+from app.utils.retry_utils import with_retry
 
 
+@with_retry(max_retries=2, base_delay=1.0)
 def web_search(query: str, count: int = 5) -> List[Dict[str, Any]]:
     """
     调用百炼 MCP 联网搜索

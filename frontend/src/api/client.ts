@@ -82,6 +82,7 @@ export async function getDocumentChunks(fileTitle: string): Promise<ChunkListRes
 export interface SSEHandlers {
   onReady?: () => void
   onThinking?: (data: SSEThinkingData) => void
+  onProgress?: (data: { done_list: string[]; running_list: string[] }) => void
   onDelta?: (data: SSEDeltaData) => void
   onFinal?: (data: SSEFinalData) => void
   onError?: (data: SSEErrorData) => void
@@ -97,6 +98,11 @@ export function listenStream(taskId: string, handlers: SSEHandlers): EventSource
   es.addEventListener('thinking', (e) => {
     const data: SSEThinkingData = JSON.parse(e.data)
     handlers.onThinking?.(data)
+  })
+
+  es.addEventListener('progress', (e) => {
+    const data = JSON.parse(e.data)
+    handlers.onProgress?.(data)
   })
 
   es.addEventListener('delta', (e) => {

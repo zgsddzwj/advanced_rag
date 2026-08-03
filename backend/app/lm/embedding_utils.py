@@ -6,6 +6,7 @@ from typing import List
 from langchain_openai import OpenAIEmbeddings
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
+from app.utils.retry_utils import with_retry
 
 _embedding_client = None
 
@@ -29,6 +30,7 @@ def get_embedding_client() -> OpenAIEmbeddings:
 EMBEDDING_BATCH_SIZE = 10
 
 
+@with_retry(max_retries=2, base_delay=1.0)
 def generate_embeddings(texts: List[str]) -> List[List[float]]:
     """
     批量生成稠密向量（自动分批，每批不超过10条）
@@ -45,6 +47,7 @@ def generate_embeddings(texts: List[str]) -> List[List[float]]:
     return all_vectors
 
 
+@with_retry(max_retries=2, base_delay=1.0)
 def generate_embedding(text: str) -> List[float]:
     """
     单条文本向量化（用于查询向量化）

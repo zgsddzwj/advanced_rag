@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Plus, MessageCircle } from 'lucide-react'
+import { Send, Plus, MessageCircle, Loader2 } from 'lucide-react'
 import { ask, listenStream, getHistory, clearHistory } from '@/api/client'
 import type { ChatMessage, SSEThinkingData } from '@/types'
 import MessageBubble from '@/components/MessageBubble'
@@ -12,6 +12,16 @@ const SUGGESTIONS = [
   '常见的故障及排除方法？',
 ]
 
+const QUERY_NODE_LABELS: Record<string, string> = {
+  node_item_name_confirm: '商品名确认',
+  node_search_embedding: '向量检索',
+  node_search_embedding_hyde: 'HyDE 检索',
+  node_web_search_mcp: '网络搜索',
+  node_rrf: 'RRF 融合',
+  node_rerank: 'Rerank 重排',
+  node_answer_output: '生成回答',
+}
+
 export default function ChatPage() {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('kb_session_id') || '')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -19,6 +29,7 @@ export default function ChatPage() {
   const [waiting, setWaiting] = useState(false)
   const [streamingText, setStreamingText] = useState('')
   const [showTyping, setShowTyping] = useState(false)
+  const [progressNodes, setProgressNodes] = useState<{ done: string[]; running: string[] }>({ done: [], running: [] })
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -40,7 +51,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     scrollToBottom()
-  }, [messages, streamingText, showTyping, scrollToBottom])
+  }, [messages, streamingText, showTyping, progressNodes, scrollToBottom])
 
   const newSession = () => {
     setSessionId('')
@@ -54,6 +65,7 @@ export default function ChatPage() {
 
     setWaiting(true)
     setShowTyping(true)
+    setProgressNodes({ done: [], running: [] })
     setInput('')
 
     // 重置思考过程
@@ -74,6 +86,9 @@ export default function ChatPage() {
           setShowTyping(false)
           window.dispatchEvent(new CustomEvent('thinking-step', { detail: d }))
         },
+        onProgress(d) {
+          setProgressNodes({ done: d.done_list || [], running: d.running_list || [] })
+        },
         onDelta(d) {
           setShowTyping(false)
           accText += d.text
@@ -84,6 +99,7 @@ export default function ChatPage() {
           setStreamingText('')
           // 延迟清除思考过程
           setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
+          setProgressNodes({ done: [], running: [] })
           setMessages(prev => [...prev, {
             role: 'assistant',
             text: d.answer || accText,
@@ -96,6 +112,7 @@ export default function ChatPage() {
           setShowTyping(false)
           setStreamingText('')
           setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
+          setProgressNodes({ done: [], running: [] })
           setMessages(prev => [...prev, { role: 'assistant', text: `⚠️ ${d.message || '生成回答时出现错误'}` }])
           setWaiting(false)
         },
@@ -103,6 +120,7 @@ export default function ChatPage() {
     } catch (e) {
       setShowTyping(false)
       setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
+      setProgressNodes({ done: [], running: [] })
       setMessages(prev => [...prev, { role: 'assistant', text: '⚠️ 网络错误，请稍后重试' }])
       setWaiting(false)
     }
@@ -162,6 +180,12 @@ export default function ChatPage() {
             ))}
             {(showTyping || waiting) && <ThinkingProcess />}
             {showTyping && <TypingIndicator />}
+            {progressNodes.running.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-400 px-2">
+                <Loader2 size={12} className="animate-spin" />
+                {progressNodes.running.map(n => QUERY_NODE_LABELS[n] || n).join(' · ')}
+              </div>
+            )}
             {streamingText && (
               <MessageBubble msg={{ role: 'assistant', text: streamingText }} streaming />
             )}

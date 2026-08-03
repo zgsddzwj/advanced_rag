@@ -4,7 +4,7 @@
 稀疏向量由 Milvus BM25 Function 自动处理
 """
 import sys
-from typing import List, Dict, Any
+from typing import List
 
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
@@ -28,21 +28,33 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
             return state
 
         # 提取所有Chunk的文本内容
-        texts = []
-        for chunk in chunks:
-            content = chunk.get("content", "")
-            texts.append(content)
+        texts = [chunk.get("content", "") for chunk in chunks]
 
         logger.info(f"开始向量化，共 {len(texts)} 条文本，批量大小: {BATCH_SIZE}")
 
-        # 分批生成向量
+        # 分批生成向量，单批失败时使用零向量降级
         all_vectors = []
+        total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
+        failed_batches = 0
+
         for i in range(0, len(texts), BATCH_SIZE):
             batch = texts[i:i + BATCH_SIZE]
-            logger.info(f"处理批次 {i // BATCH_SIZE + 1}/{(len(texts) + BATCH_SIZE - 1) // BATCH_SIZE}，"
-                        f"本批 {len(batch)} 条")
-            vectors = generate_embeddings(batch)
-            all_vectors.extend(vectors)
+            batch_num = i // BATCH_SIZE + 1
+            logger.info(f"处理批次 {batch_num}/{total_batches}，本批 {len(batch)} 条")
+
+            try:
+                vectors = generate_embeddings(batch)
+                all_vectors.extend(vectors)
+            except Exception as e:
+                logger.error(f"批次 {batch_num} 向量化失败，使用零向量降级: {e}")
+                # 降级：使用零向量填充，避免整个流程中断
+                from app.conf.lm_config import lm_config
+                zero_vector = [0.0] * lm_config.EMBEDDING_DIM
+                all_vectors.extend([zero_vector] * len(batch))
+                failed_batches += 1
+
+        if failed_batches > 0:
+            logger.warning(f"向量化完成（含 {failed_batches}/{total_batches} 个失败批次降级）")
 
         # 将向量回填到Chunk
         for idx, chunk in enumerate(chunks):
