@@ -19,6 +19,7 @@ from app.lm.embedding_utils import generate_embedding
 from app.clients.milvus_utils import get_milvus_client
 from app.clients.mongo_history_utils import get_recent_messages, save_chat_message
 from app.conf.milvus_config import milvus_config
+from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start, push_thinking_done
 
@@ -82,22 +83,6 @@ def _load_history(state: QueryGraphState) -> List[Dict[str, Any]]:
         return []
 
 
-def _format_history(history: List[Dict[str, Any]]) -> str:
-    """将历史对话格式化为文本"""
-    if not history:
-        return "（无历史对话）"
-
-    lines = []
-    for msg in history:
-        role = msg.get("role", "")
-        text = msg.get("text", "")
-        if role == "user":
-            lines.append(f"用户：{text}")
-        elif role == "assistant":
-            lines.append(f"助手：{text}")
-    return "\n".join(lines) if lines else "（无历史对话）"
-
-
 def _rewrite_and_extract(
     state: QueryGraphState, history: List[Dict[str, Any]]
 ) -> Tuple[str, List[str]]:
@@ -107,7 +92,7 @@ def _rewrite_and_extract(
         return "", []
 
     try:
-        history_text = _format_history(history)
+        history_text = format_history(history)
         prompt = load_prompt("item_name_confirm", history=history_text, query=query)
 
         llm = get_llm_client()

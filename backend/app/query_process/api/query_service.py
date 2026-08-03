@@ -11,7 +11,11 @@ from pydantic import BaseModel
 
 from app.core.logger import logger
 from app.utils.sse_utils import create_sse_queue, sse_generator, push_to_session, SSEEvent
-from app.utils.task_utils import update_task_status, get_task_status, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
+from app.utils.task_utils import (
+    update_task_status, get_task_status,
+    get_done_task_list, get_running_task_list,
+    TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED,
+)
 from app.query_process.agent.main_graph import kb_query_app
 from app.query_process.agent.state import create_default_state
 from app.clients.mongo_history_utils import get_recent_messages, clear_history
@@ -90,7 +94,6 @@ async def delete_history(session_id: str):
 async def get_query_status(task_id: str):
     """查询任务状态"""
     status = get_task_status(task_id)
-    from app.utils.task_utils import get_done_task_list, get_running_task_list
     return {
         "task_id": task_id,
         "status": status,

@@ -12,7 +12,11 @@ from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
-from app.utils.task_utils import update_task_status, get_task_status, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
+from app.utils.task_utils import (
+    update_task_status, get_task_status,
+    get_done_task_list, get_running_task_list,
+    TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED,
+)
 from app.import_process.agent.main_graph import kb_import_app
 from app.import_process.agent.state import create_default_state
 from app.clients.document_meta_utils import compute_content_hash, get_metadata, upsert_metadata
@@ -59,7 +63,6 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
 async def get_import_status(task_id: str):
     """查询导入任务状态"""
     status = get_task_status(task_id)
-    from app.utils.task_utils import get_done_task_list, get_running_task_list
     return {
         "task_id": task_id,
         "status": status,

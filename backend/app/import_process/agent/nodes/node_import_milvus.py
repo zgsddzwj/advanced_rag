@@ -2,9 +2,8 @@
 入库Milvus节点
 创建集合（含BM25 Function）→ 批量插入Chunks → 写入ItemNames
 """
-import os
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task

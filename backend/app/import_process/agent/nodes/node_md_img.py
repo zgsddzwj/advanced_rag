@@ -5,14 +5,16 @@ MD文件图片处理节点
 import os
 import re
 import sys
+import time
 import base64
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from app.clients.minio_utils import get_minio_client
+from app.clients.minio_utils import get_minio_client, upload_file
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
 from app.lm.vlm_utils import get_vlm_client
+from app.conf.minio_config import minio_config
 from langchain_core.messages import HumanMessage
 from app.core.logger import logger
 
@@ -143,7 +145,6 @@ def _step_3_generate_summaries(doc_stem: str, targets: List[Tuple[str, str, Tupl
     """批量为待处理图片生成内容摘要"""
     summaries = {}
     for img_file, image_path, context in targets:
-        import time
         time.sleep(0.5)  # 简单限速，避免API限流
         summaries[img_file] = _summarize_image(image_path, root_folder=doc_stem, image_content=context)
     logger.info(f"图片摘要批量生成完成，共处理 {len(summaries)} 张图片")
@@ -152,10 +153,7 @@ def _step_3_generate_summaries(doc_stem: str, targets: List[Tuple[str, str, Tupl
 
 def _step_4_upload_and_replace(doc_stem: str, targets, summaries: Dict[str, str], md_content: str) -> str:
     """上传图片至MinIO，替换MD图片路径"""
-    from app.clients.minio_utils import upload_file
-
-    img_dir = os.getenv("MINIO_IMG_DIR", "images")
-    upload_dir = f"{img_dir}/{doc_stem}".replace(" ", "")
+    upload_dir = f"{minio_config.IMG_DIR}/{doc_stem}".replace(" ", "")
 
     # 上传图片并获取URL映射
     urls = {}

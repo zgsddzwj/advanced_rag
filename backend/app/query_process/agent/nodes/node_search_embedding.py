@@ -3,7 +3,6 @@
 对改写后的查询进行 Dense + BM25 混合检索
 """
 import sys
-from typing import List, Dict, Any
 
 from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
@@ -14,7 +13,7 @@ from app.clients.milvus_utils import (
     hybrid_search,
 )
 from app.conf.milvus_config import milvus_config
-from app.utils.escape_milvus_string_utils import escape_milvus_string
+from app.query_process.agent.search_utils import build_filter_expr, normalize_results
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
 
@@ -55,8 +54,8 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
         dense_vector = generate_embedding(query)
         logger.info(f"查询向量化完成，维度: {len(dense_vector)}")
 
-        # Step 2: 构造过滤表达式（基于文档主题）
-        expr = _build_filter_expr(state.get("item_names", []))
+        # Step 2: 构造过滤表达式（基于商品名）
+        expr = build_filter_expr(state.get("item_names", []))
 
         # Step 3: 构造混合搜索请求
         reqs = create_hybrid_search_requests(
@@ -79,7 +78,7 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
         )
 
         # Step 5: 规范化结果
-        chunks = _normalize_results(results, source="embedding")
+        chunks = normalize_results(results, source="embedding")
         state["embedding_chunks"] = chunks
 
         logger.info(f"向量检索完成: 返回 {len(chunks)} 条结果")
@@ -91,47 +90,3 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
         add_done_task(state["task_id"], func_name, is_stream)
 
     return state
-
-
-def _build_filter_expr(item_names: List[str]) -> str:
-    """构造 Milvus 过滤表达式"""
-    if not item_names:
-        return ""
-
-    escaped_names = [escape_milvus_string(name) for name in item_names if name]
-    if not escaped_names:
-        return ""
-
-    # item_name in ["name1", "name2"]
-    names_str = ", ".join([f'"{n}"' for n in escaped_names])
-    expr = f"item_name in [{names_str}]"
-    logger.info(f"过滤表达式: {expr}")
-    return expr
-
-
-def _normalize_results(results: List[Dict[str, Any]], source: str) -> List[Dict[str, Any]]:
-    """规范化检索结果，统一格式"""
-    chunks = []
-    if not results:
-        return chunks
-
-    # Milvus hybrid_search 返回的是 list[list[dict]] 或 list[dict]
-    # 统一处理
-    result_list = results[0] if results and isinstance(results[0], list) else results
-
-    for hit in result_list:
-        entity = hit.get("entity", hit)
-        chunk = {
-            "chunk_id": entity.get("chunk_id", hit.get("id", "")),
-            "content": entity.get("content", ""),
-            "title": entity.get("title", ""),
-            "parent_title": entity.get("parent_title", ""),
-            "part": entity.get("part", 0),
-            "file_title": entity.get("file_title", ""),
-            "item_name": entity.get("item_name", ""),
-            "score": hit.get("distance", 0.0),
-            "source": source,
-        }
-        chunks.append(chunk)
-
-    return chunks

@@ -3,16 +3,15 @@ MongoDB 对话历史工具
 负责多轮对话的存取管理
 """
 import os
-import logging
 from typing import List, Dict, Any
 from datetime import datetime
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, DESCENDING, ASCENDING
 from bson import ObjectId
 from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.logger import logger
 
-logger = logging.getLogger(__name__)
+load_dotenv()
 
 
 class HistoryMongoTool:
@@ -30,9 +29,9 @@ class HistoryMongoTool:
             # 创建复合索引：session_id 升序 + ts 降序
             self.chat_message.create_index([("session_id", 1), ("ts", -1)])
 
-            logging.info(f"MongoDB 连接成功: {self.db_name}")
+            logger.info(f"MongoDB 连接成功: {self.db_name}")
         except Exception as e:
-            logging.error(f"MongoDB 连接失败: {e}")
+            logger.error(f"MongoDB 连接失败: {e}")
             raise
 
 
@@ -41,7 +40,7 @@ _history_mongo_tool = None
 try:
     _history_mongo_tool = HistoryMongoTool()
 except Exception as e:
-    logging.warning(f"MongoDB 模块加载时初始化失败: {e}")
+    logger.warning(f"MongoDB 模块加载时初始化失败: {e}")
 
 
 def get_history_mongo_tool() -> HistoryMongoTool:
@@ -57,10 +56,10 @@ def clear_history(session_id: str) -> int:
     mongo_tool = get_history_mongo_tool()
     try:
         result = mongo_tool.chat_message.delete_many({"session_id": session_id})
-        logging.info(f"Deleted {result.deleted_count} messages for session {session_id}")
+        logger.info(f"已删除 {result.deleted_count} 条消息 (session: {session_id})")
         return result.deleted_count
     except Exception as e:
-        logging.error(f"Error clearing history for session {session_id}: {e}")
+        logger.error(f"清空历史对话失败 (session: {session_id}): {e}")
         return 0
 
 
@@ -104,14 +103,16 @@ def save_chat_message(
 def get_recent_messages(session_id: str, limit: int = 10) -> List[Dict[str, Any]]:
     """
     查询指定会话的最近 N 条对话记录
-    结果按时间正序排列
+    结果按时间正序排列（先按 ts 降序取最近 N 条，再反转为正序）
     """
     mongo_tool = get_history_mongo_tool()
     try:
         query = {"session_id": session_id}
-        cursor = mongo_tool.chat_message.find(query).sort("ts", ASCENDING).limit(limit)
+        # 先按 ts 降序取最近的 limit 条，再反转为时间正序
+        cursor = mongo_tool.chat_message.find(query).sort("ts", DESCENDING).limit(limit)
         messages = list(cursor)
+        messages.reverse()
         return messages
     except Exception as e:
-        logging.error(f"Error getting recent messages: {e}")
+        logger.error(f"获取最近消息失败 (session: {session_id}): {e}")
         return []

@@ -17,6 +17,7 @@ from app.core.logger import logger
 from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
 from app.clients.mongo_history_utils import save_chat_message
+from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.sse_utils import push_to_session, SSEEvent
 from app.utils.thinking_utils import push_thinking_start
@@ -119,7 +120,7 @@ def _build_prompt(
 ) -> str:
     """构建回答 Prompt"""
     # 格式化历史对话
-    history_text = _format_history(history)
+    history_text = format_history(history)
     item_names_text = "、".join(item_names) if item_names else "无"
 
     prompt = load_prompt(
@@ -130,22 +131,6 @@ def _build_prompt(
         question=query,
     )
     return prompt
-
-
-def _format_history(history: List[Dict[str, Any]]) -> str:
-    """格式化历史对话"""
-    if not history:
-        return "（无历史对话）"
-
-    lines = []
-    for msg in history:
-        role = msg.get("role", "")
-        text = msg.get("text", "")
-        if role == "user":
-            lines.append(f"用户：{text}")
-        elif role == "assistant":
-            lines.append(f"助手：{text}")
-    return "\n".join(lines) if lines else "（无历史对话）"
 
 
 def _stream_generate(prompt: str, task_id: str) -> str:

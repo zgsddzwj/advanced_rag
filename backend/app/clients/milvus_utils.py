@@ -135,7 +135,6 @@ def hybrid_search(
     client: MilvusClient,
     collection_name: str,
     reqs: List[AnnSearchRequest],
-    ranker_weights: tuple = (0.8, 0.2),
     limit: int = 5,
     output_fields: List[str] = None
 ) -> List[List[Dict]]:

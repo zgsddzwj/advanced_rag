@@ -2,9 +2,8 @@
 文档主题识别节点
 利用LLM从文档切片中提取文档主题/关键词，生成稠密向量存入Milvus
 """
-import os
 import sys
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Tuple
 
 from langchain_core.messages import SystemMessage, HumanMessage
 

@@ -6,7 +6,7 @@ HyDE 假设性文档检索节点（节点3）
 4. 判断是否需要网络搜索
 """
 import sys
-from typing import List, Dict, Any
+from typing import List, Dict
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -21,7 +21,7 @@ from app.clients.milvus_utils import (
     hybrid_search,
 )
 from app.conf.milvus_config import milvus_config
-from app.utils.escape_milvus_string_utils import escape_milvus_string
+from app.query_process.agent.search_utils import build_filter_expr, normalize_results
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
 
@@ -71,7 +71,7 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
         dense_vector = generate_embedding(hyde_text)
 
         # Step 3: 构造过滤表达式
-        expr = _build_filter_expr(state.get("item_names", []))
+        expr = build_filter_expr(state.get("item_names", []))
 
         # Step 4: 构造混合搜索请求
         reqs = create_hybrid_search_requests(
@@ -94,7 +94,7 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
         )
 
         # Step 6: 规范化结果
-        chunks = _normalize_results(results, source="hyde")
+        chunks = normalize_results(results, source="hyde")
         state["hyde_chunks"] = chunks
 
         # Step 7: 判断是否需要网络搜索
@@ -138,46 +138,6 @@ def _generate_hyde_text(query: str) -> str:
     except Exception as e:
         logger.error(f"生成 HyDE 文本失败: {e}，使用原始查询替代")
         return query
-
-
-def _build_filter_expr(item_names: List[str]) -> str:
-    """构造 Milvus 过滤表达式"""
-    if not item_names:
-        return ""
-
-    escaped_names = [escape_milvus_string(name) for name in item_names if name]
-    if not escaped_names:
-        return ""
-
-    names_str = ", ".join([f'"{n}"' for n in escaped_names])
-    expr = f"item_name in [{names_str}]"
-    return expr
-
-
-def _normalize_results(results: List[Dict[str, Any]], source: str) -> List[Dict[str, Any]]:
-    """规范化检索结果"""
-    chunks = []
-    if not results:
-        return chunks
-
-    result_list = results[0] if results and isinstance(results[0], list) else results
-
-    for hit in result_list:
-        entity = hit.get("entity", hit)
-        chunk = {
-            "chunk_id": entity.get("chunk_id", hit.get("id", "")),
-            "content": entity.get("content", ""),
-            "title": entity.get("title", ""),
-            "parent_title": entity.get("parent_title", ""),
-            "part": entity.get("part", 0),
-            "file_title": entity.get("file_title", ""),
-            "item_name": entity.get("item_name", ""),
-            "score": hit.get("distance", 0.0),
-            "source": source,
-        }
-        chunks.append(chunk)
-
-    return chunks
 
 
 def _count_unique_chunks(
