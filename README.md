@@ -269,8 +269,9 @@ cd frontend && npm run dev
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/import/upload` | 上传文件并触发导入 |
+| POST | `/api/import/upload` | 上传文件并触发导入（限制 100MB） |
 | GET | `/api/import/status/{task_id}` | 查询导入状态 |
+| GET | `/api/import/health` | 导入服务健康检查 |
 
 ### 查询 API
 

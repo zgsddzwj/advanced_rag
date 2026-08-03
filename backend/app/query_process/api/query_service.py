@@ -5,9 +5,9 @@
 import uuid
 import threading
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.core.logger import logger
 from app.utils.sse_utils import create_sse_queue, sse_generator, push_to_session, SSEEvent
@@ -27,6 +27,17 @@ class QueryRequest(BaseModel):
     """查询请求"""
     query: str
     session_id: str = ""
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        """校验查询文本"""
+        v = v.strip()
+        if not v:
+            raise ValueError("查询内容不能为空")
+        if len(v) > 2000:
+            raise ValueError("查询内容过长，请限制在 2000 字以内")
+        return v
 
 
 @router.post("/ask")

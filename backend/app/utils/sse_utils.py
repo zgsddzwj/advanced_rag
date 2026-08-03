@@ -5,6 +5,7 @@ SSE 事件队列管理工具
 """
 import asyncio
 import json
+import time
 from enum import Enum
 from typing import Dict, Any, Optional
 from app.core.logger import logger
@@ -24,6 +25,10 @@ class SSEEvent(Enum):
 _sse_queues: Dict[str, asyncio.Queue] = {}
 # 全局事件循环字典：session_id → event_loop（用于跨线程推送）
 _sse_loops: Dict[str, asyncio.AbstractEventLoop] = {}
+# 队列创建时间戳：用于检测和清理被遗弃的队列
+_sse_create_times: Dict[str, float] = {}
+# 被遗弃队列的最大存活时间（秒）
+SSE_QUEUE_MAX_AGE = 600  # 10 分钟
 
 
 def create_sse_queue(session_id: str, loop: Optional[asyncio.AbstractEventLoop] = None):
@@ -36,6 +41,7 @@ def create_sse_queue(session_id: str, loop: Optional[asyncio.AbstractEventLoop] 
 
     _sse_queues[session_id] = asyncio.Queue()
     _sse_loops[session_id] = loop
+    _sse_create_times[session_id] = time.time()
     logger.info(f"SSE 队列创建: {session_id}")
 
 
@@ -117,4 +123,20 @@ async def sse_generator(session_id: str, request=None):
     # 清理队列和事件循环引用
     _sse_queues.pop(session_id, None)
     _sse_loops.pop(session_id, None)
+    _sse_create_times.pop(session_id, None)
     logger.info(f"SSE 队列清理: {session_id}")
+
+
+def cleanup_stale_queues():
+    """清理被遗弃的 SSE 队列（创建超过 SSE_QUEUE_MAX_AGE 且无活跃消费者）"""
+    now = time.time()
+    stale_ids = [
+        sid for sid, create_ts in _sse_create_times.items()
+        if now - create_ts > SSE_QUEUE_MAX_AGE
+    ]
+    for sid in stale_ids:
+        _sse_queues.pop(sid, None)
+        _sse_loops.pop(sid, None)
+        _sse_create_times.pop(sid, None)
+        logger.warning(f"清理被遗弃的 SSE 队列: {sid}")
+    return len(stale_ids)

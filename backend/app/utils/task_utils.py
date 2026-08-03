@@ -1,8 +1,11 @@
 """
 任务状态管理工具
 基于内存字典管理任务执行进度，供前端轮询
+支持 TTL 自动清理，防止内存泄漏
 """
-from typing import Dict, List, Any
+import time
+import threading
+from typing import Dict, List, Any, Optional
 from app.core.logger import logger
 
 # 任务状态常量
@@ -11,8 +14,54 @@ TASK_STATUS_PROCESSING = "processing"
 TASK_STATUS_COMPLETED = "completed"
 TASK_STATUS_FAILED = "failed"
 
+# 已完成/失败任务的保留时间（秒），超时后自动清理
+TASK_TTL_SECONDS = 3600  # 1 小时
+# 清理检查间隔（秒）
+CLEANUP_INTERVAL = 600  # 10 分钟
+
 # 全局任务状态字典
 _task_store: Dict[str, Dict[str, Any]] = {}
+# 任务完成时间戳记录
+_task_done_timestamp: Dict[str, float] = {}
+# 清理线程锁
+_cleanup_lock = threading.Lock()
+_cleanup_started = False
+
+
+def _start_cleanup_thread():
+    """启动后台清理线程（仅启动一次）"""
+    global _cleanup_started
+    with _cleanup_lock:
+        if _cleanup_started:
+            return
+        _cleanup_started = True
+        thread = threading.Thread(target=_cleanup_loop, daemon=True)
+        thread.start()
+        logger.info("任务状态清理线程已启动")
+
+
+def _cleanup_loop():
+    """后台清理循环"""
+    while True:
+        time.sleep(CLEANUP_INTERVAL)
+        try:
+            _cleanup_expired_tasks()
+        except Exception as e:
+            logger.warning(f"任务清理异常: {e}")
+
+
+def _cleanup_expired_tasks():
+    """清理过期的已完成/失败任务"""
+    now = time.time()
+    expired_ids = [
+        task_id for task_id, done_ts in _task_done_timestamp.items()
+        if now - done_ts > TASK_TTL_SECONDS
+    ]
+    for task_id in expired_ids:
+        _task_store.pop(task_id, None)
+        _task_done_timestamp.pop(task_id, None)
+    if expired_ids:
+        logger.info(f"清理过期任务: {len(expired_ids)} 个")
 
 
 def _ensure_task(task_id: str):
@@ -31,6 +80,10 @@ def update_task_status(task_id: str, status: str, is_stream: bool = False):
     _ensure_task(task_id)
     _task_store[task_id]["status"] = status
     logger.info(f"[{task_id}] 任务状态更新: {status}")
+
+    # 记录完成时间戳，用于 TTL 清理
+    if status in (TASK_STATUS_COMPLETED, TASK_STATUS_FAILED):
+        _task_done_timestamp[task_id] = time.time()
 
 
 def add_running_task(task_id: str, node_name: str, is_stream: bool = False):
@@ -87,3 +140,7 @@ def get_task_result(task_id: str, key: str, default: Any = None) -> Any:
     """获取任务结果数据"""
     _ensure_task(task_id)
     return _task_store[task_id]["results"].get(key, default)
+
+
+# 启动自动清理线程
+_start_cleanup_thread()

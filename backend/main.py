@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import HTTPException
 
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
@@ -95,6 +96,10 @@ if FRONTEND_DIST.exists():
 
 # ==================== 前端页面路由 (SPA) ====================
 
+# 已知的前端路由列表
+SPA_ROUTES = {"/", "/import", "/chat"}
+
+
 @app.get("/")
 async def index():
     """首页"""
@@ -119,6 +124,27 @@ async def documents_page():
     return FileResponse(str(FRONTEND_DIST / "index.html"))
 
 
+@app.exception_handler(404)
+async def spa_fallback(request: Request, exc: HTTPException):
+    """SPA 路由回退：非 API 路径的 404 返回 index.html，支持前端客户端路由"""
+    path = request.url.path
+    # API 路径返回标准 JSON 404
+    if path.startswith("/api/"):
+        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    # 前端静态资源路径返回标准 404
+    if path.startswith("/assets/"):
+        return JSONResponse(status_code=404, content={"detail": "Asset Not Found"})
+    # 其他路径回退到 index.html（SPA 客户端路由）
+    if FRONTEND_DIST.exists():
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
+    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(
+        app,
+        host="0.0.0.0",
+        port=8000,
+        timeout_graceful_shutdown=10,
+    )

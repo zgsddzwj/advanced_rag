@@ -5,10 +5,11 @@
 """
 import os
 import asyncio
+import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
 
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
@@ -27,6 +28,27 @@ router = APIRouter(prefix="/import", tags=["import"])
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
+# 文件大小限制：100MB
+MAX_FILE_SIZE = 100 * 1024 * 1024
+# 允许的文件扩展名
+ALLOWED_EXTENSIONS = {".pdf", ".md"}
+
+
+def _sanitize_filename(filename: str) -> str:
+    """
+    安全化文件名：移除路径分隔符和特殊字符
+    防止目录遍历攻击
+    """
+    # 仅保留文件名部分（去除路径）
+    filename = os.path.basename(filename)
+    # 移除控制字符和特殊字符
+    filename = re.sub(r'[\x00-\x1f<>:"/\\|?*]', '_', filename)
+    # 限制长度
+    if len(filename) > 200:
+        name, ext = os.path.splitext(filename)
+        filename = name[:200 - len(ext)] + ext
+    return filename
+
 
 @router.post("/upload")
 async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
@@ -34,29 +56,48 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
     上传文件并触发导入流程
     返回 task_id 供前端轮询
     """
+    # 校验文件名和扩展名
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="文件名不能为空")
+
+    safe_filename = _sanitize_filename(file.filename)
+    file_ext = os.path.splitext(safe_filename)[1].lower()
+
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件格式: {file_ext}，仅支持 {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
     # 生成唯一 task_id
     task_id = str(uuid.uuid4())[:8]
 
-    # 保存文件
+    # 保存文件（带大小校验）
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    file_ext = os.path.splitext(file.filename)[1]
-    saved_filename = f"{task_id}_{file.filename}"
+    saved_filename = f"{task_id}_{safe_filename}"
     saved_path = UPLOAD_DIR / saved_filename
 
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件大小超过限制: {len(content) / 1024 / 1024:.1f}MB > {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
+        )
+
     with open(saved_path, "wb") as f:
-        content = await file.read()
         f.write(content)
 
-    logger.info(f"文件上传成功: {saved_filename}，task_id: {task_id}")
+    logger.info(f"文件上传成功: {saved_filename}，task_id: {task_id}，大小: {len(content) / 1024:.0f}KB")
 
     # 创建输出目录
-    output_dir = OUTPUT_DIR / f"{task_id}_{os.path.splitext(file.filename)[0]}"
+    file_stem = os.path.splitext(safe_filename)[0]
+    output_dir = OUTPUT_DIR / f"{task_id}_{file_stem}"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 后台执行导入流程
     background_tasks.add_task(_run_import, task_id, str(saved_path), str(output_dir))
 
-    return {"task_id": task_id, "filename": file.filename, "status": "processing"}
+    return {"task_id": task_id, "filename": safe_filename, "status": "processing"}
 
 
 @router.get("/status/{task_id}")
@@ -69,6 +110,12 @@ async def get_import_status(task_id: str):
         "done_list": get_done_task_list(task_id),
         "running_list": get_running_task_list(task_id)
     }
+
+
+@router.get("/health")
+async def health():
+    """导入服务健康检查"""
+    return {"status": "ok", "service": "import"}
 
 
 def _run_import(task_id: str, file_path: str, output_dir: str):
