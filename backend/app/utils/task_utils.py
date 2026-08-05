@@ -142,5 +142,10 @@ def get_task_result(task_id: str, key: str, default: Any = None) -> Any:
     return _task_store[task_id]["results"].get(key, default)
 
 
+def get_all_task_ids() -> List[str]:
+    """获取所有任务 ID 列表"""
+    return list(_task_store.keys())
+
+
 # 启动自动清理线程
 _start_cleanup_thread()
