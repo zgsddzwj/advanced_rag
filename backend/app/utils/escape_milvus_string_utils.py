@@ -3,6 +3,8 @@ Milvus 字符串转义工具
 用于构造 filter 表达式时安全处理字符串
 """
 
+__all__ = ["escape_milvus_string"]
+
 
 def escape_milvus_string(s: str) -> str:
     """
