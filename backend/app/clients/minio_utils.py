@@ -3,11 +3,12 @@ MinIO 客户端工具
 负责文件上传、下载、桶管理
 """
 import io
+from typing import Optional
 from minio import Minio
 from app.core.logger import logger
 from app.conf.minio_config import minio_config
 
-_minio_client = None
+_minio_client: Optional[Minio] = None
 
 
 def get_minio_client() -> Minio:
