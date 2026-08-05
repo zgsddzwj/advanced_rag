@@ -2,13 +2,14 @@
 VLM 客户端封装（Qwen-VL-Plus via 百炼）
 用于图片语义理解，生成图片文本描述
 """
+from typing import Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
 from app.utils.retry_utils import with_retry
 
-_vlm_client = None
+_vlm_client: Optional[ChatOpenAI] = None
 
 
 def get_vlm_client() -> ChatOpenAI:
