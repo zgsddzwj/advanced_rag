@@ -18,6 +18,7 @@ LOG_CONSOLE_LEVEL = os.getenv("LOG_CONSOLE_LEVEL", "INFO").upper()
 LOG_FILE_ENABLE = os.getenv("LOG_FILE_ENABLE", "True").lower() == "true"
 LOG_FILE_LEVEL = os.getenv("LOG_FILE_LEVEL", "INFO").upper()
 LOG_FILE_RETENTION = os.getenv("LOG_FILE_RETENTION", "7 days")
+LOG_FILE_ENCODING = os.getenv("LOG_FILE_ENCODING", "utf-8")
 
 # 定义日志路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -55,7 +56,7 @@ def init_logger():
             format=LOG_FORMAT,
             rotation="00:00",
             retention=LOG_FILE_RETENTION,
-            encoding="utf-8",
+            encoding=LOG_FILE_ENCODING,
             enqueue=True,
             backtrace=True,
             diagnose=True
