@@ -24,6 +24,10 @@ def rerank_documents(
     :param top_n: 返回 Top N
     :return: 排序后的文档列表（新增 score 字段）
     """
+    if not documents:
+        logger.warning("Rerank 输入文档列表为空，跳过重排序")
+        return []
+
     texts = [doc.get(text_field, "") for doc in documents]
 
     result = dashscope.TextReRank.call(
