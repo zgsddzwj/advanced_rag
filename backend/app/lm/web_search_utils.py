@@ -17,6 +17,10 @@ def web_search(query: str, count: int = 5) -> List[Dict[str, Any]]:
     :param count: 返回结果数量
     :return: 搜索结果列表 [{title, url, content, source}, ...]
     """
+    if not query or not query.strip():
+        logger.warning("网络搜索查询词为空，跳过搜索")
+        return []
+
     result = dashscope.Application.call(
         api_key=bailian_mcp_config.DASHSCOPE_API_KEY,
         app_id=bailian_mcp_config.BAILIAN_MCP_APP_ID,
