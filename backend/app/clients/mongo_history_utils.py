@@ -116,3 +116,17 @@ def get_recent_messages(session_id: str, limit: int = 10) -> List[Dict[str, Any]
     except Exception as e:
         logger.error(f"获取最近消息失败 (session: {session_id}): {e}")
         return []
+
+
+def get_message_count(session_id: str) -> int:
+    """
+    获取指定会话的消息总数
+    :param session_id: 会话 ID
+    :return: 消息数量
+    """
+    mongo_tool = get_history_mongo_tool()
+    try:
+        return mongo_tool.chat_message.count_documents({"session_id": session_id})
+    except Exception as e:
+        logger.error(f"获取消息数量失败 (session: {session_id}): {e}")
+        return 0
