@@ -6,6 +6,8 @@ from typing import Optional
 from app.utils.sse_utils import push_to_session, SSEEvent
 from app.core.logger import logger
 
+__all__ = ["push_thinking_start", "push_thinking_done"]
+
 
 # 查询流程节点 → 友好的中文描述映射
 _THINKING_MESSAGES = {
