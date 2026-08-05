@@ -10,7 +10,7 @@ from pymilvus import (
 from app.core.logger import logger
 from app.conf.milvus_config import milvus_config
 
-_milvus_client = None
+_milvus_client: Optional[MilvusClient] = None
 
 
 def get_milvus_client() -> MilvusClient:
