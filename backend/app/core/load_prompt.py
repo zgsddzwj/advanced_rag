@@ -3,6 +3,7 @@ Prompt 模板加载器
 从 prompts/ 目录加载 .prompt 文件，支持变量替换
 """
 import os
+from typing import List
 from app.core.logger import logger
 
 # Prompt 模板目录
@@ -36,3 +37,17 @@ def load_prompt(name: str, **kwargs) -> str:
             logger.error(f"Prompt 模板变量替换失败，缺少变量: {e}")
             raise
     return template
+
+
+def list_prompts() -> List[str]:
+    """
+    列出所有可用的 Prompt 模板名称
+    :return: 模板名称列表（不含 .prompt 后缀）
+    """
+    if not os.path.exists(PROMPT_DIR):
+        return []
+    return [
+        f.replace(".prompt", "")
+        for f in os.listdir(PROMPT_DIR)
+        if f.endswith(".prompt")
+    ]
