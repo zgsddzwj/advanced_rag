@@ -2,13 +2,13 @@
 Embedding 客户端封装（text-embedding-v3 via 百炼）
 仅生成稠密向量，稀疏向量由 Milvus BM25 自动处理
 """
-from typing import List
+from typing import List, Optional
 from langchain_openai import OpenAIEmbeddings
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
 from app.utils.retry_utils import with_retry
 
-_embedding_client = None
+_embedding_client: Optional[OpenAIEmbeddings] = None
 
 
 def get_embedding_client() -> OpenAIEmbeddings:
