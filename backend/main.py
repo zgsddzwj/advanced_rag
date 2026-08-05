@@ -65,7 +65,7 @@ async def lifespan(app: FastAPI):
         logger.info("Kafka 未启用，文档事件同步功能不可用")
 
     yield
-    logger.info("===== NexusRAG 服务关闭 =====")
+    logger.info("===== Advanced RAG 服务关闭 =====")
 
     # 停止 Kafka 消费者和生产者
     await stop_kafka_consumer()
