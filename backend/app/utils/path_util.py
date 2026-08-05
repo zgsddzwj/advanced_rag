@@ -6,3 +6,6 @@ from pathlib import Path
 
 # 项目根目录：从当前文件向上回溯到项目根
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+
+# 输出目录
+OUTPUT_DIR = PROJECT_ROOT / "output"
