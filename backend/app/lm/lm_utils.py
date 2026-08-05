@@ -2,11 +2,12 @@
 LLM 客户端封装（Qwen-Plus via 百炼 OpenAI 兼容接口）
 使用 langchain_openai.ChatOpenAI，单例模式
 """
+from typing import Optional
 from langchain_openai import ChatOpenAI
 from app.core.logger import logger
 from app.conf.lm_config import lm_config
 
-_llm_client = None
+_llm_client: Optional[ChatOpenAI] = None
 
 
 def get_llm_client() -> ChatOpenAI:
