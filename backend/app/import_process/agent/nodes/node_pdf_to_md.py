@@ -119,11 +119,12 @@ def _step_2_upload_and_poll(pdf_path_obj: Path, output_dir_obj: Path) -> str:
     finally:
         upload_session.close()
 
-    # 3. 轮询任务状态
+    # 3. 轮询任务状态（指数退避，减少长任务的无效 API 调用）
     poll_url = f"{MINERU_BASE_URL}/extract-results/batch/{batch_id}"
     start_time = time.time()
     timeout_seconds = 600
     poll_interval = 3
+    max_poll_interval = 15
 
     while True:
         elapsed_time = time.time() - start_time
@@ -135,11 +136,13 @@ def _step_2_upload_and_poll(pdf_path_obj: Path, output_dir_obj: Path) -> str:
         except Exception as e:
             logger.warning(f"轮询请求异常，{poll_interval}秒后重试: {str(e)}")
             time.sleep(poll_interval)
+            poll_interval = min(poll_interval * 2, max_poll_interval)
             continue
 
         if poll_resp.status_code != 200:
             if 500 <= poll_resp.status_code < 600:
                 time.sleep(poll_interval)
+                poll_interval = min(poll_interval * 2, max_poll_interval)
                 continue
             raise RuntimeError(f"轮询HTTP失败，状态码: {poll_resp.status_code}")
 
@@ -150,6 +153,7 @@ def _step_2_upload_and_poll(pdf_path_obj: Path, output_dir_obj: Path) -> str:
         extract_results = poll_data["data"]["extract_result"]
         if not extract_results:
             time.sleep(poll_interval)
+            poll_interval = min(poll_interval * 2, max_poll_interval)
             continue
 
         result_item = extract_results[0]
@@ -165,7 +169,9 @@ def _step_2_upload_and_poll(pdf_path_obj: Path, output_dir_obj: Path) -> str:
             err_msg = result_item.get("err_msg", "未知错误")
             raise RuntimeError(f"解析任务失败: {err_msg}")
         else:
+            # 指数退避：每次轮询间隔翻倍，上限 max_poll_interval
             time.sleep(poll_interval)
+            poll_interval = min(poll_interval * 2, max_poll_interval)
 
 
 def _step_3_download_and_extract(zip_url: str, output_dir_obj: Path, pdf_stem: str) -> str:

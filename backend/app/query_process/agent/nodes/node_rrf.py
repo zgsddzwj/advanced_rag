@@ -3,6 +3,7 @@ RRF 融合节点（节点5）
 对向量检索、HyDE 检索、网络搜索三路结果进行 RRF（Reciprocal Rank Fusion）融合排序
 """
 import sys
+import hashlib
 from typing import List, Dict, Any
 
 from app.query_process.agent.state import QueryGraphState
@@ -63,29 +64,13 @@ def _rrf_fuse(
     """
     scores: Dict[str, Dict[str, Any]] = {}
 
-    # 向量检索结果
-    for rank, chunk in enumerate(embedding_chunks):
-        key = _get_chunk_key(chunk)
-        if key not in scores:
-            scores[key] = {"chunk": chunk, "score": 0.0, "sources": set()}
-        scores[key]["score"] += 1.0 / (RRF_K + rank + 1)
-        scores[key]["sources"].add("embedding")
-
-    # HyDE 检索结果
-    for rank, chunk in enumerate(hyde_chunks):
-        key = _get_chunk_key(chunk)
-        if key not in scores:
-            scores[key] = {"chunk": chunk, "score": 0.0, "sources": set()}
-        scores[key]["score"] += 1.0 / (RRF_K + rank + 1)
-        scores[key]["sources"].add("hyde")
-
-    # 网络搜索结果
-    for rank, chunk in enumerate(web_search_docs):
-        key = _get_chunk_key(chunk)
-        if key not in scores:
-            scores[key] = {"chunk": chunk, "score": 0.0, "sources": set()}
-        scores[key]["score"] += 1.0 / (RRF_K + rank + 1)
-        scores[key]["sources"].add("web")
+    # 统一处理三路检索结果
+    for chunks, source_name in (
+        (embedding_chunks, "embedding"),
+        (hyde_chunks, "hyde"),
+        (web_search_docs, "web"),
+    ):
+        _accumulate_scores(scores, chunks, source_name)
 
     # 按分数降序排序
     sorted_items = sorted(scores.values(), key=lambda x: x["score"], reverse=True)
@@ -101,11 +86,25 @@ def _rrf_fuse(
     return result
 
 
+def _accumulate_scores(
+    scores: Dict[str, Dict[str, Any]],
+    chunks: List[Dict[str, Any]],
+    source_name: str,
+) -> None:
+    """对单路检索结果累加 RRF 分数"""
+    for rank, chunk in enumerate(chunks):
+        key = _get_chunk_key(chunk)
+        if key not in scores:
+            scores[key] = {"chunk": chunk, "score": 0.0, "sources": set()}
+        scores[key]["score"] += 1.0 / (RRF_K + rank + 1)
+        scores[key]["sources"].add(source_name)
+
+
 def _get_chunk_key(chunk: Dict[str, Any]) -> str:
-    """获取 chunk 的唯一标识，用于去重"""
+    """获取 chunk 的唯一标识，用于去重（使用 hashlib 保证跨进程确定性）"""
     chunk_id = chunk.get("chunk_id", "")
     if chunk_id:
         return str(chunk_id)
-    # 无 chunk_id 则用 content 前缀
+    # 无 chunk_id 则用 content 前缀的 md5 摘要
     content = chunk.get("content", "")[:200]
-    return f"content_{hash(content)}"
+    return f"content_{hashlib.md5(content.encode('utf-8')).hexdigest()}"
