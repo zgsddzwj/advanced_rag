@@ -1,10 +1,34 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
 import 'highlight.js/styles/github-dark.css'
-import { Tag } from 'lucide-react'
+import { Tag, Copy, Check } from 'lucide-react'
 import type { ChatMessage } from '@/types'
+
+function CodeBlockCopyButton({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      className="absolute top-2 right-2 p-1.5 rounded-md bg-gray-700/80 hover:bg-gray-600 text-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+      title="复制代码"
+    >
+      {copied ? <Check size={14} /> : <Copy size={14} />}
+    </button>
+  )
+}
 
 export default function MessageBubble({ msg, streaming }: { msg: ChatMessage; streaming?: boolean }) {
   const isUser = msg.role === 'user'
@@ -30,7 +54,30 @@ export default function MessageBubble({ msg, streaming }: { msg: ChatMessage; st
           <div className="whitespace-pre-wrap">{msg.text}</div>
         ) : (
           <div className="markdown-body" ref={textRef}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                pre({ children, ...props }) {
+                  // 提取代码文本用于复制
+                  let codeText = ''
+                  if (children && typeof children === 'object' && 'props' in (children as any)) {
+                    const childProps = (children as any).props
+                    codeText = typeof childProps?.children === 'string'
+                      ? childProps.children
+                      : Array.isArray(childProps?.children)
+                        ? childProps.children.filter((c: any) => typeof c === 'string').join('')
+                        : ''
+                  }
+                  return (
+                    <div className="group relative">
+                      <CodeBlockCopyButton code={codeText} />
+                      <pre {...props}>{children}</pre>
+                    </div>
+                  )
+                },
+              }}
+            >
               {msg.text || ' '}
             </ReactMarkdown>
           </div>
