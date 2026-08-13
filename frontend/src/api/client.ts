@@ -89,41 +89,71 @@ export interface SSEHandlers {
 }
 
 export function listenStream(taskId: string, handlers: SSEHandlers): EventSource {
-  const es = new EventSource(`${API_BASE}/query/stream/${taskId}`)
+  const url = `${API_BASE}/query/stream/${taskId}`
+  let es: EventSource
+  let reconnectAttempts = 0
+  const MAX_RECONNECT = 3
+  let reconnectDelay = 1000
+  let closed = false
 
-  es.addEventListener('ready', () => {
-    handlers.onReady?.()
-  })
+  const connect = () => {
+    es = new EventSource(url)
 
-  es.addEventListener('thinking', (e) => {
-    const data: SSEThinkingData = JSON.parse(e.data)
-    handlers.onThinking?.(data)
-  })
+    es.addEventListener('ready', () => {
+      reconnectAttempts = 0
+      reconnectDelay = 1000
+      handlers.onReady?.()
+    })
 
-  es.addEventListener('progress', (e) => {
-    const data = JSON.parse(e.data)
-    handlers.onProgress?.(data)
-  })
+    es.addEventListener('thinking', (e) => {
+      const data: SSEThinkingData = JSON.parse(e.data)
+      handlers.onThinking?.(data)
+    })
 
-  es.addEventListener('delta', (e) => {
-    const data: SSEDeltaData = JSON.parse(e.data)
-    handlers.onDelta?.(data)
-  })
+    es.addEventListener('progress', (e) => {
+      const data = JSON.parse(e.data)
+      handlers.onProgress?.(data)
+    })
 
-  es.addEventListener('final', (e) => {
-    const data: SSEFinalData = JSON.parse(e.data)
-    handlers.onFinal?.(data)
-    es.close()
-  })
+    es.addEventListener('delta', (e) => {
+      const data: SSEDeltaData = JSON.parse(e.data)
+      handlers.onDelta?.(data)
+    })
 
-  es.addEventListener('error', () => {
-    if (es.readyState === EventSource.CLOSED) {
-      handlers.onError?.({ message: '连接已关闭' })
-    } else {
-      handlers.onError?.({ message: 'SSE 连接错误' })
-    }
-    es.close()
-  })
+    es.addEventListener('final', (e) => {
+      const data: SSEFinalData = JSON.parse(e.data)
+      handlers.onFinal?.(data)
+      closed = true
+      es.close()
+    })
 
-  return es
+    es.addEventListener('error', () => {
+      if (es.readyState === EventSource.CLOSED) {
+        if (!closed && reconnectAttempts < MAX_RECONNECT) {
+          reconnectAttempts += 1
+          setTimeout(() => {
+            if (!closed) connect()
+          }, reconnectDelay)
+          reconnectDelay = Math.min(reconnectDelay * 2, 5000)
+        } else {
+          handlers.onError?.({ message: '连接已关闭' })
+          closed = true
+        }
+      } else {
+        handlers.onError?.({ message: 'SSE 连接错误' })
+      }
+      if (closed) es.close()
+    })
+  }
+
+  connect()
+
+  // 返回一个可控制的 EventSource-like 对象
+  return {
+    close: () => {
+      closed = true
+      es?.close()
+    },
+    readyState: EventSource.CLOSED,
+  } as EventSource
 }
