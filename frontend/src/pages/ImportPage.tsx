@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   DoorOpen, FileText, Image as ImageIcon, Scissors, Tag, Hash, Database,
   Upload, CheckCircle2, Loader2, XCircle, FileUp, RefreshCw,
   type LucideIcon,
 } from 'lucide-react'
 import { uploadFile, getImportStatus } from '@/api/client'
-import { IMPORT_NODES, POLL_INTERVAL, type ImportStatusResponse } from '@/types'
+import { IMPORT_NODES, type ImportStatusResponse } from '@/types'
 
 const iconMap: Record<string, LucideIcon> = {
   DoorOpen, FileText, ImageIcon, Scissors, Tag, Hash, Database,
@@ -21,7 +21,14 @@ export default function ImportPage() {
   const [resultBanner, setResultBanner] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 组件卸载时清理轮询定时器
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearTimeout(pollRef.current)
+    }
+  }, [])
 
   const handleFileSelect = useCallback((file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase()
@@ -58,21 +65,28 @@ export default function ImportPage() {
       const data = await uploadFile(selectedFile)
       setTaskId(data.task_id)
       setStatus({ task_id: data.task_id, status: 'processing', done_list: [], running_list: [] })
-      pollRef.current = setInterval(async () => {
+
+      // 指数退避轮询
+      let pollDelay = 2000
+      const maxDelay = 10000
+      const poll = async () => {
         try {
           const s = await getImportStatus(data.task_id)
           setStatus(s)
           if (s.status === 'completed') {
-            if (pollRef.current) clearInterval(pollRef.current)
             setResultBanner({ type: 'success', msg: `导入完成！文件 "${selectedFile.name}" 已成功写入知识库。` })
+            return
           } else if (s.status === 'failed') {
-            if (pollRef.current) clearInterval(pollRef.current)
             setResultBanner({ type: 'error', msg: '导入失败，请检查日志或重试。' })
+            return
           }
         } catch (e) {
           console.error('轮询失败:', e)
         }
-      }, POLL_INTERVAL)
+        pollDelay = Math.min(pollDelay * 1.5, maxDelay)
+        pollRef.current = setTimeout(poll, pollDelay)
+      }
+      pollRef.current = setTimeout(poll, pollDelay)
     } catch (e) {
       setResultBanner({ type: 'error', msg: `上传失败: ${(e as Error).message}` })
     } finally {
@@ -85,7 +99,7 @@ export default function ImportPage() {
     setTaskId('')
     setStatus(null)
     setResultBanner(null)
-    if (pollRef.current) clearInterval(pollRef.current)
+    if (pollRef.current) clearTimeout(pollRef.current)
   }
 
   return (
