@@ -14,8 +14,12 @@ export default function Layout() {
   const location = useLocation()
   const [online, setOnline] = useState(true)
 
+  // 定期健康检查（每 30 秒）
   useEffect(() => {
-    healthCheck().then(() => setOnline(true)).catch(() => setOnline(false))
+    const check = () => healthCheck().then(() => setOnline(true)).catch(() => setOnline(false))
+    check()
+    const timer = setInterval(check, 30000)
+    return () => clearInterval(timer)
   }, [])
 
   const pageTitle = navItems.find(n => n.to === location.pathname)?.label || 'NexusRAG'
