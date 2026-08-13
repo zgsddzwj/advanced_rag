@@ -7,7 +7,7 @@ from typing import List, Dict
 
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
-from app.clients.milvus_utils import get_milvus_client, create_chunks_collection
+from app.clients.milvus_utils import get_milvus_client, create_chunks_collection, ensure_collection_loaded
 from app.utils.escape_milvus_string_utils import escape_milvus_string
 from app.conf.milvus_config import milvus_config
 from app.conf.lm_config import lm_config
@@ -66,7 +66,7 @@ def node_import_milvus(state: ImportGraphState) -> ImportGraphState:
             logger.info(f"批次插入完成: {inserted_count}/{len(chunks)}")
 
         # 加载集合使数据可查
-        client.load_collection(collection_name=collection_name)
+        ensure_collection_loaded(client, collection_name)
         logger.info(f"入库完成，共插入 {inserted_count} 条Chunk到集合 {collection_name}")
 
     except Exception as e:

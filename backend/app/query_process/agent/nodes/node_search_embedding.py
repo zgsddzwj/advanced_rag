@@ -11,6 +11,7 @@ from app.clients.milvus_utils import (
     get_milvus_client,
     create_hybrid_search_requests,
     hybrid_search,
+    ensure_collection_loaded,
 )
 from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import build_filter_expr, normalize_results
@@ -48,7 +49,7 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
             return state
 
         # 确保集合已加载
-        client.load_collection(collection_name=collection_name)
+        ensure_collection_loaded(client, collection_name)
 
         # Step 1: 生成稠密向量
         dense_vector = generate_embedding(query)

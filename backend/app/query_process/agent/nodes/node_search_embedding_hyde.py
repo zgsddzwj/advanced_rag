@@ -19,6 +19,7 @@ from app.clients.milvus_utils import (
     get_milvus_client,
     create_hybrid_search_requests,
     hybrid_search,
+    ensure_collection_loaded,
 )
 from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import build_filter_expr, normalize_results
@@ -65,7 +66,7 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
             state["need_web_search"] = True
             return state
 
-        client.load_collection(collection_name=collection_name)
+        ensure_collection_loaded(client, collection_name)
 
         # Step 2: 向量化假设性回答
         dense_vector = generate_embedding(hyde_text)

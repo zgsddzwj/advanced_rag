@@ -16,7 +16,7 @@ from app.core.logger import logger
 from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
 from app.lm.embedding_utils import generate_embedding
-from app.clients.milvus_utils import get_milvus_client
+from app.clients.milvus_utils import get_milvus_client, ensure_collection_loaded
 from app.clients.mongo_history_utils import get_recent_messages, save_chat_message
 from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import format_history
@@ -156,7 +156,7 @@ def _align_item_names(item_names: List[str]) -> List[str]:
             logger.warning(f"集合 {collection_name} 不存在，跳过文档主题对齐")
             return item_names
 
-        client.load_collection(collection_name=collection_name)
+        ensure_collection_loaded(client, collection_name)
 
         for name in item_names:
             # 生成文档主题向量

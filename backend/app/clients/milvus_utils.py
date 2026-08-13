@@ -11,6 +11,8 @@ from app.core.logger import logger
 from app.conf.milvus_config import milvus_config
 
 _milvus_client: Optional[MilvusClient] = None
+# 已加载集合缓存，避免重复调用 load_collection
+_loaded_collections: set = set()
 
 
 def get_milvus_client() -> MilvusClient:
@@ -20,6 +22,15 @@ def get_milvus_client() -> MilvusClient:
         _milvus_client = MilvusClient(uri=milvus_config.MILVUS_URL)
         logger.info(f"Milvus 客户端连接成功: {milvus_config.MILVUS_URL}")
     return _milvus_client
+
+
+def ensure_collection_loaded(client: MilvusClient, collection_name: str):
+    """确保集合已加载到内存（幂等，跳过已加载的集合）"""
+    if collection_name not in _loaded_collections:
+        client.load_collection(collection_name=collection_name)
+        _loaded_collections.add(collection_name)
+        logger.info(f"Milvus 集合已加载: {collection_name}")
+
 
 
 def create_chunks_collection(client: MilvusClient, collection_name: str, vector_dimension: int):
