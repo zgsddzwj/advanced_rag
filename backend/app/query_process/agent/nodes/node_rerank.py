@@ -43,14 +43,24 @@ def node_rerank(state: QueryGraphState) -> QueryGraphState:
 
         # 截取前 N 条进行 Rerank（API 有数量限制）
         candidates = rrf_chunks[:MAX_CONTEXT_CHUNKS]
+
+        # 结果集过小则跳过 Rerank，直接使用 RRF 结果
+        if len(candidates) <= 1:
+            logger.info(f"RRF 结果仅 {len(candidates)} 条，跳过 Rerank")
+            state["reranked_docs"] = candidates
+            return state
+
         logger.info(f"Rerank 候选: {len(candidates)} 条，query: {query[:50]}...")
+
+        # 动态 top_n：不超过候选数
+        effective_top_n = min(RERANK_TOP_N, len(candidates))
 
         # 调用 gte-rerank API
         reranked = rerank_documents(
             query=query,
             documents=candidates,
             text_field="content",
-            top_n=RERANK_TOP_N,
+            top_n=effective_top_n,
         )
 
         # 动态截断：过滤低分结果
