@@ -102,6 +102,15 @@ async def sse_generator(session_id: str, request=None):
     yield f"event: ready\ndata: {json.dumps({'session_id': session_id})}\n\n"
 
     while True:
+        # 检测客户端是否已断开连接
+        if request is not None:
+            try:
+                if await request.is_disconnected():
+                    logger.info(f"SSE 客户端主动断开: {session_id}")
+                    break
+            except Exception:
+                pass
+
         try:
             msg = await asyncio.wait_for(queue.get(), timeout=15.0)
         except asyncio.TimeoutError:
