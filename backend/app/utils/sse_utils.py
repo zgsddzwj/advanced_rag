@@ -103,7 +103,7 @@ async def sse_generator(session_id: str, request=None):
 
     while True:
         try:
-            msg = await asyncio.wait_for(queue.get(), timeout=30.0)
+            msg = await asyncio.wait_for(queue.get(), timeout=15.0)
         except asyncio.TimeoutError:
             # 发送心跳，同时检测客户端是否还在线
             try:
@@ -133,6 +133,12 @@ async def sse_generator(session_id: str, request=None):
     _sse_loops.pop(session_id, None)
     _sse_create_times.pop(session_id, None)
     logger.info(f"SSE 队列清理: {session_id}")
+
+    # 顺便清理其他陈旧队列
+    try:
+        cleanup_stale_queues()
+    except Exception:
+        pass
 
 
 def cleanup_stale_queues():
