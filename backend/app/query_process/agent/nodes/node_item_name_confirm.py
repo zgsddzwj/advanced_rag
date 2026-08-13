@@ -158,7 +158,7 @@ def _align_item_names(item_names: List[str]) -> List[str]:
 
         client.load_collection(collection_name=collection_name)
 
-            for name in item_names:
+        for name in item_names:
             # 生成文档主题向量
             dense_vector = generate_embedding(name)
 
