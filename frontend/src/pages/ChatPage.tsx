@@ -38,7 +38,8 @@ export default function ChatPage() {
   const [showTyping, setShowTyping] = useState(false)
   const [progressNodes, setProgressNodes] = useState<{ done: string[]; running: string[] }>({ done: [], running: [] })
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const sseRef = useRef<EventSource | null>(null)
 
   // 加载历史
   useEffect(() => {
@@ -66,10 +67,24 @@ export default function ChatPage() {
     scrollToBottom()
   }, [messages, streamingText, showTyping, progressNodes, scrollToBottom])
 
+  // 自动聚焦输入框
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [sessionId, waiting])
+
+  // 组件卸载时关闭 SSE 连接
+  useEffect(() => {
+    return () => {
+      sseRef.current?.close()
+    }
+  }, [])
+
   const newSession = () => {
+    sseRef.current?.close()
     setSessionId('')
     setMessages([])
     localStorage.removeItem('kb_session_id')
+    inputRef.current?.focus()
   }
 
   const sendQuery = async (query?: string) => {
@@ -94,7 +109,7 @@ export default function ChatPage() {
 
       // SSE 流式接收
       let accText = ''
-      listenStream(data.task_id, {
+      sseRef.current = listenStream(data.task_id, {
         onThinking(d: SSEThinkingData) {
           setShowTyping(false)
           window.dispatchEvent(new CustomEvent('thinking-step', { detail: d }))
@@ -143,6 +158,14 @@ export default function ChatPage() {
   const quickAsk = (q: string) => {
     setInput(q)
     sendQuery(q)
+  }
+
+  // textarea 自适应高度
+  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
 
   const isEmpty = messages.length === 0 && !streamingText && !showTyping
@@ -209,16 +232,22 @@ export default function ChatPage() {
 
       {/* 输入区域 */}
       <div className="px-8 py-4 bg-white border-t border-gray-100">
-        <div className="flex gap-3 items-center">
-          <input
+        <div className="flex gap-3 items-end">
+          <textarea
             ref={inputRef}
-            type="text"
             value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery() } }}
-            placeholder="输入你的问题..."
+            onChange={handleInput}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                sendQuery()
+              }
+            }}
+            placeholder="输入你的问题... (Shift+Enter 换行)"
             disabled={waiting}
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50"
+            rows={1}
+            className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 resize-none"
+            style={{ maxHeight: '120px' }}
           />
           <button
             onClick={() => sendQuery()}
