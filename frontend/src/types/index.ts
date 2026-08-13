@@ -28,6 +28,7 @@ export interface AskResponse {
 }
 
 export interface ChatMessage {
+  id?: string
   role: 'user' | 'assistant'
   text: string
   rewritten_query?: string

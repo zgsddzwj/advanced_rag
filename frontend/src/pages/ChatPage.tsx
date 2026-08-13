@@ -22,6 +22,13 @@ const QUERY_NODE_LABELS: Record<string, string> = {
   node_answer_output: '生成回答',
 }
 
+// 全局消息 ID 计数器（保证唯一性）
+let _msgIdCounter = 0
+function nextMsgId(): string {
+  _msgIdCounter += 1
+  return `msg_${Date.now()}_${_msgIdCounter}`
+}
+
 export default function ChatPage() {
   const [sessionId, setSessionId] = useState(() => localStorage.getItem('kb_session_id') || '')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -37,15 +44,21 @@ export default function ChatPage() {
   useEffect(() => {
     if (sessionId) {
       getHistory(sessionId).then(data => {
-        if (data.messages?.length > 0) setMessages(data.messages)
+        if (data.messages?.length > 0) {
+          // 为历史消息补充唯一 ID
+          setMessages(data.messages.map((m: ChatMessage) => ({ ...m, id: nextMsgId() })))
+        }
       }).catch(console.error)
     }
   }, [sessionId])
 
-  // 自动滚动到底部
+  // 智能滚动：仅在用户接近底部时自动滚动
   const scrollToBottom = useCallback(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    const el = scrollRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 120) {
+      el.scrollTop = el.scrollHeight
     }
   }, [])
 
@@ -71,8 +84,8 @@ export default function ChatPage() {
     // 重置思考过程
     window.dispatchEvent(new CustomEvent('thinking-reset'))
 
-    // 添加用户消息
-    setMessages(prev => [...prev, { role: 'user', text: q }])
+    // 添加用户消息（带唯一 ID）
+    setMessages(prev => [...prev, { id: nextMsgId(), role: 'user', text: q }])
 
     try {
       const data = await ask(q, sessionId)
@@ -101,6 +114,7 @@ export default function ChatPage() {
           setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
           setProgressNodes({ done: [], running: [] })
           setMessages(prev => [...prev, {
+            id: nextMsgId(),
             role: 'assistant',
             text: d.answer || accText,
             image_urls: d.image_urls || [],
@@ -113,7 +127,7 @@ export default function ChatPage() {
           setStreamingText('')
           setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
           setProgressNodes({ done: [], running: [] })
-          setMessages(prev => [...prev, { role: 'assistant', text: `⚠️ ${d.message || '生成回答时出现错误'}` }])
+          setMessages(prev => [...prev, { id: nextMsgId(), role: 'assistant', text: `⚠️ ${d.message || '生成回答时出现错误'}` }])
           setWaiting(false)
         },
       })
@@ -121,7 +135,7 @@ export default function ChatPage() {
       setShowTyping(false)
       setTimeout(() => window.dispatchEvent(new CustomEvent('thinking-reset')), 500)
       setProgressNodes({ done: [], running: [] })
-      setMessages(prev => [...prev, { role: 'assistant', text: '⚠️ 网络错误，请稍后重试' }])
+      setMessages(prev => [...prev, { id: nextMsgId(), role: 'assistant', text: '⚠️ 网络错误，请稍后重试' }])
       setWaiting(false)
     }
   }
@@ -175,9 +189,9 @@ export default function ChatPage() {
           </div>
         ) : (
           <>
-            {messages.map((msg, i) => (
-              <MessageBubble key={i} msg={msg} />
-            ))}
+            {messages.map((msg) => (
+              <MessageBubble key={msg.id || nextMsgId()} msg={msg} />
+            ))}}
             {(showTyping || waiting) && <ThinkingProcess />}
             {showTyping && <TypingIndicator />}
             {progressNodes.running.length > 0 && (
@@ -187,7 +201,7 @@ export default function ChatPage() {
               </div>
             )}
             {streamingText && (
-              <MessageBubble msg={{ role: 'assistant', text: streamingText }} streaming />
+              <MessageBubble msg={{ id: 'streaming', role: 'assistant', text: streamingText }} streaming />
             )}
           </>
         )}
