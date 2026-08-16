@@ -8,6 +8,7 @@
 import sys
 import re
 from typing import List, Dict, Any, Tuple
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.messages import SystemMessage, HumanMessage
 
@@ -27,6 +28,8 @@ from app.utils.thinking_utils import push_thinking_start, push_thinking_done
 ITEM_NAME_MATCH_THRESHOLD = 0.65
 # 历史对话最大轮数
 HISTORY_MAX_MESSAGES = 10
+# 主题对齐并行线程数
+ALIGN_MAX_WORKERS = 3
 
 
 def node_item_name_confirm(state: QueryGraphState) -> QueryGraphState:
@@ -146,7 +149,6 @@ def _align_item_names(item_names: List[str]) -> List[str]:
         return []
 
     collection_name = milvus_config.ITEM_NAMES_COLLECTION
-    aligned = []
 
     try:
         client = get_milvus_client()
@@ -158,38 +160,51 @@ def _align_item_names(item_names: List[str]) -> List[str]:
 
         ensure_collection_loaded(client, collection_name)
 
-        for name in item_names:
-            # 生成文档主题向量
-            dense_vector = generate_embedding(name)
+        # 并行处理多个 item_name 的向量对齐
+        def _align_single(name: str) -> str:
+            """对单个 item_name 进行向量对齐"""
+            try:
+                dense_vector = generate_embedding(name)
+                results = client.search(
+                    collection_name=collection_name,
+                    data=[dense_vector],
+                    anns_field="dense_vector",
+                    limit=1,
+                    output_fields=["item_name", "file_title"],
+                )
 
-            # 在 kb_item_names 中搜索
-            results = client.search(
-                collection_name=collection_name,
-                data=[dense_vector],
-                anns_field="dense_vector",
-                limit=1,
-                output_fields=["item_name", "file_title"],
-            )
+                if results and len(results) > 0 and len(results[0]) > 0:
+                    top_hit = results[0][0]
+                    score = top_hit.get("distance", 0)
+                    matched_name = top_hit.get("entity", {}).get("item_name", "")
 
-            if results and len(results) > 0 and len(results[0]) > 0:
-                top_hit = results[0][0]
-                score = top_hit.get("distance", 0)
-                matched_name = top_hit.get("entity", {}).get("item_name", "")
-
-                if score >= ITEM_NAME_MATCH_THRESHOLD and matched_name:
-                    logger.info(f"文档主题对齐: '{name}' → '{matched_name}' (score={score:.4f})")
-                    aligned.append(matched_name)
+                    if score >= ITEM_NAME_MATCH_THRESHOLD and matched_name:
+                        logger.info(f"文档主题对齐: '{name}' → '{matched_name}' (score={score:.4f})")
+                        return matched_name
+                    else:
+                        logger.info(f"文档主题未对齐: '{name}' (最近匹配 score={score:.4f})")
+                        return name
                 else:
-                    logger.info(f"文档主题未对齐: '{name}' (最近匹配 score={score:.4f})")
-                    aligned.append(name)
-            else:
-                aligned.append(name)
+                    return name
+            except Exception as e:
+                logger.warning(f"单个文档主题对齐失败: '{name}', {e}")
+                return name
+
+        aligned = [None] * len(item_names)
+        with ThreadPoolExecutor(max_workers=ALIGN_MAX_WORKERS) as executor:
+            future_to_idx = {
+                executor.submit(_align_single, name): idx
+                for idx, name in enumerate(item_names)
+            }
+            for future in as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                aligned[idx] = future.result()
+
+        return aligned
 
     except Exception as e:
         logger.error(f"文档主题对齐失败: {e}")
         return item_names
-
-    return aligned
 
 
 def _save_user_message(
