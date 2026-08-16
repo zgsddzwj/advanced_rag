@@ -112,6 +112,10 @@ def get_recent_messages(session_id: str, limit: int = 10) -> List[Dict[str, Any]
         cursor = mongo_tool.chat_message.find(query).sort("ts", DESCENDING).limit(limit)
         messages = list(cursor)
         messages.reverse()
+        # 统一将 _id (ObjectId) 转为字符串，便于 JSON 序列化
+        for msg in messages:
+            if "_id" in msg:
+                msg["_id"] = str(msg["_id"])
         return messages
     except Exception as e:
         logger.error(f"获取最近消息失败 (session: {session_id}): {e}")
