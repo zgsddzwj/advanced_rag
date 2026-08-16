@@ -97,7 +97,7 @@ export default function DocumentsPage() {
         ) : (
           <div className="space-y-3">
             {chunks.map((chunk, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <div key={`${chunk.file_title}_${chunk.part}_${i}`} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* 切片头部 */}
                 <div className="px-5 py-3 bg-gray-50/80 border-b border-gray-100 flex items-center gap-3">
                   <span className="w-7 h-7 bg-indigo-500 text-white rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0">
@@ -203,7 +203,7 @@ export default function DocumentsPage() {
               {doc.titles.length > 0 && (
                 <div className="mt-3 pt-3 border-t border-gray-50 flex flex-wrap gap-1.5">
                   {doc.titles.slice(0, 4).map((t, i) => (
-                    <span key={i} className="text-xs px-2 py-0.5 bg-gray-50 text-gray-500 rounded line-clamp-1 max-w-[200px]">
+                    <span key={`title_${i}`} className="text-xs px-2 py-0.5 bg-gray-50 text-gray-500 rounded line-clamp-1 max-w-[200px]">
                       {t.replace(/^#+\s*/, '')}
                     </span>
                   ))}
