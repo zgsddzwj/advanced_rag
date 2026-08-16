@@ -28,7 +28,7 @@ export default function Dashboard() {
       </div>
 
       {/* 统计卡片 */}
-      <div className="grid grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
         {stats.map(s => {
           const Icon = s.icon
           return (
@@ -44,7 +44,7 @@ export default function Dashboard() {
       </div>
 
       {/* 功能入口 */}
-      <div className="grid grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <div
           onClick={() => navigate('/import')}
           className="bg-white rounded-xl shadow-sm p-8 border-2 border-transparent hover:border-indigo-400 hover:shadow-md cursor-pointer transition-all"
