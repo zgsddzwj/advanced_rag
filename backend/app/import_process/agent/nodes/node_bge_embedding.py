@@ -32,10 +32,12 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
 
         logger.info(f"开始向量化，共 {len(texts)} 条文本，批量大小: {BATCH_SIZE}")
 
-        # 分批生成向量，单批失败时使用零向量降级
+        # 分批生成向量，单批失败时跳过该批次（避免零向量噪声）
         all_vectors = []
         total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
         failed_batches = 0
+        # 记录每个 chunk 的向量是否有效
+        valid_flags = []
 
         for i in range(0, len(texts), BATCH_SIZE):
             batch = texts[i:i + BATCH_SIZE]
@@ -45,24 +47,29 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
             try:
                 vectors = generate_embeddings(batch)
                 all_vectors.extend(vectors)
+                valid_flags.extend([True] * len(batch))
             except Exception as e:
-                logger.error(f"批次 {batch_num} 向量化失败，使用零向量降级: {e}")
-                # 降级：使用零向量填充，避免整个流程中断
-                from app.conf.lm_config import lm_config
-                zero_vector = [0.0] * lm_config.EMBEDDING_DIM
-                all_vectors.extend([zero_vector] * len(batch))
+                logger.error(f"批次 {batch_num} 向量化失败，跳过该批次: {e}")
+                # 用 None 占位，后续入库时过滤
+                all_vectors.extend([None] * len(batch))
+                valid_flags.extend([False] * len(batch))
                 failed_batches += 1
 
         if failed_batches > 0:
-            logger.warning(f"向量化完成（含 {failed_batches}/{total_batches} 个失败批次降级）")
+            logger.warning(f"向量化完成（含 {failed_batches}/{total_batches} 个失败批次跳过）")
 
-        # 将向量回填到Chunk
+        # 将向量回填到 Chunk，过滤掉无效向量
+        valid_chunks = []
         for idx, chunk in enumerate(chunks):
-            chunk["dense_vector"] = all_vectors[idx]
+            if idx < len(all_vectors) and all_vectors[idx] is not None:
+                chunk["dense_vector"] = all_vectors[idx]
+                valid_chunks.append(chunk)
+            else:
+                logger.warning(f"Chunk {idx} 向量为空，已跳过")
 
-        state["chunks"] = chunks
-        state["embeddings_content"] = all_vectors
-        logger.info(f"向量化完成，共生成 {len(all_vectors)} 个向量")
+        state["chunks"] = valid_chunks
+        state["embeddings_content"] = [v for v in all_vectors if v is not None]
+        logger.info(f"向量化完成，有效向量 {len(state['embeddings_content'])} 个，跳过 {failed_batches * BATCH_SIZE} 条")
 
     except Exception as e:
         logger.error(f"向量化失败: {str(e)}", exc_info=True)
