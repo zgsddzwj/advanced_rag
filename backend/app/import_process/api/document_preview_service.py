@@ -18,6 +18,7 @@ async def list_documents():
     """
     获取所有已导入的文档列表
     按 file_title 聚合，返回每个文档的切片数、文档主题等信息
+    优化：只查询聚合所需字段，减少数据传输量
     """
     try:
         client = get_milvus_client()
@@ -28,11 +29,11 @@ async def list_documents():
 
         client.load_collection(collection_name=collection_name)
 
-        # 查询所有数据，按 file_title 去重统计
+        # 只查询聚合所需字段，避免传输全量 content
         all_data = client.query(
             collection_name=collection_name,
             filter="",
-            output_fields=["file_title", "item_name", "title", "content"],
+            output_fields=["file_title", "item_name", "title"],
             limit=16384,
         )
 
