@@ -66,11 +66,15 @@ body {
   border-collapse: collapse;
   margin: 0.75rem 0;
   width: 100%;
+  display: block;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .markdown-body th, .markdown-body td {
   border: 1px solid #e5e7eb;
   padding: 8px 12px;
   text-align: left;
+  white-space: nowrap;
 }
 .markdown-body th { background: #f9fafb; font-weight: 600; }
 .markdown-body img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
