@@ -1,3 +1,5 @@
+
+
 # NexusRAG — 智能知识检索引擎
 
 > 基于 LangGraph 编排的企业级 RAG 系统，支持 PDF/MD 智能导入、Dense+BM25 混合检索、HyDE 增强、RRF 融合与 Rerank 精排，提供流式问答体验。
@@ -178,8 +180,10 @@ npm install
 ```bash
 # 复制模板到 backend/ 目录（后端从此目录加载 .env）
 cp .env.example backend/.env
-# 编辑 backend/.env，填入真实的 DASHSCOPE_API_KEY
-# 获取地址：https://bailian.console.aliyun.com/ → 模型广场 → API Key
+# 编辑 backend/.env，填入真实的 API 凭证
+# - DASHSCOPE_API_KEY：https://bailian.console.aliyun.com/ → 模型广场 → API Key
+# - MINERU_API_TOKEN：https://mineru.net/ → 个人中心 → API Token
+# - BAILIAN_MCP_APP_ID：百炼应用广场 → 创建应用
 ```
 
 ### 3. 启动基础设施
