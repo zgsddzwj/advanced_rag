@@ -156,7 +156,6 @@ export default function ChatPage() {
   }
 
   const quickAsk = (q: string) => {
-    setInput(q)
     sendQuery(q)
   }
 
