@@ -129,12 +129,13 @@ def _step_2_upload_and_poll(pdf_path_obj: Path, output_dir_obj: Path) -> str:
     while True:
         elapsed_time = time.time() - start_time
         if elapsed_time > timeout_seconds:
+            logger.error(f"PDF解析超时: batch_id={batch_id}, 文件={pdf_path_obj.name}, 已耗时={int(elapsed_time)}s")
             raise TimeoutError(f"任务超时({int(timeout_seconds)}s)，batch_id: {batch_id}")
 
         try:
             poll_resp = requests.get(url=poll_url, headers=request_headers, timeout=10)
         except Exception as e:
-            logger.warning(f"轮询请求异常，{poll_interval}秒后重试: {str(e)}")
+            logger.warning(f"轮询请求异常(batch_id={batch_id})，{poll_interval}秒后重试: {str(e)}")
             time.sleep(poll_interval)
             poll_interval = min(poll_interval * 2, max_poll_interval)
             continue
