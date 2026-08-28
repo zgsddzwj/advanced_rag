@@ -35,6 +35,8 @@ _sse_queues: Dict[str, asyncio.Queue] = {}
 _sse_loops: Dict[str, asyncio.AbstractEventLoop] = {}
 # 队列创建时间戳：用于检测和清理被遗弃的队列
 _sse_create_times: Dict[str, float] = {}
+# 活跃消费者集合：sse_generator 正在消费的 session，清理时必须跳过
+_sse_active_consumers: set = set()
 # 被遗弃队列的最大存活时间（秒）
 SSE_QUEUE_MAX_AGE = 600  # 10 分钟
 
@@ -64,20 +66,25 @@ def push_to_session(session_id: str, event: SSEEvent, data: Dict[str, Any]):
 
     msg = {"event": event.value, "data": data}
     loop = _sse_loops.get(session_id)
+    # 先持有队列引用，避免消费结束/陈旧清理并发执行时触发 KeyError
+    queue = _sse_queues.get(session_id)
+    if queue is None:
+        logger.warning(f"SSE 队列已被清理: {session_id}，跳过推送")
+        return
 
     try:
         if loop is not None and loop.is_running():
             # 从其他线程安全推送
-            loop.call_soon_threadsafe(_sse_queues[session_id].put_nowait, msg)
+            loop.call_soon_threadsafe(queue.put_nowait, msg)
         else:
             # 同线程直接推送
-            _sse_queues[session_id].put_nowait(msg)
+            queue.put_nowait(msg)
     except asyncio.QueueFull:
         logger.warning(f"SSE 队列已满: {session_id}")
     except RuntimeError:
         # 事件循环已关闭，直接推送
         try:
-            _sse_queues[session_id].put_nowait(msg)
+            queue.put_nowait(msg)
         except Exception:
             pass
 
@@ -96,7 +103,14 @@ async def sse_generator(session_id: str, request=None):
             yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列创建超时'})}\n\n"
             return
 
-    queue = _sse_queues[session_id]
+    queue = _sse_queues.get(session_id)
+    if queue is None:
+        # 队列在等待期间已被并发清理
+        yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列已被清理'})}\n\n"
+        return
+
+    # 标记活跃消费者，防止 cleanup_stale_queues 误杀长连接
+    _sse_active_consumers.add(session_id)
 
     # 发送 ready 事件
     yield f"event: ready\ndata: {json.dumps({'session_id': session_id})}\n\n"
@@ -116,7 +130,7 @@ async def sse_generator(session_id: str, request=None):
         except asyncio.TimeoutError:
             # 发送心跳，同时检测客户端是否还在线
             try:
-                yield f": heartbeat\n\n"
+                yield ": heartbeat\n\n"
             except Exception:
                 logger.info(f"SSE 客户端断开（心跳失败）: {session_id}")
                 break
@@ -141,6 +155,7 @@ async def sse_generator(session_id: str, request=None):
     _sse_queues.pop(session_id, None)
     _sse_loops.pop(session_id, None)
     _sse_create_times.pop(session_id, None)
+    _sse_active_consumers.discard(session_id)
     logger.info(f"SSE 队列清理: {session_id}")
 
     # 顺便清理其他陈旧队列
@@ -155,7 +170,8 @@ def cleanup_stale_queues():
     now = time.time()
     stale_ids = [
         sid for sid, create_ts in _sse_create_times.items()
-        if now - create_ts > SSE_QUEUE_MAX_AGE
+        if sid not in _sse_active_consumers
+        and now - create_ts > SSE_QUEUE_MAX_AGE
     ]
     for sid in stale_ids:
         _sse_queues.pop(sid, None)
