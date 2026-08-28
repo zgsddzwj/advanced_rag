@@ -3,32 +3,25 @@ API 调用重试工具
 为外部 API 调用（LLM、Embedding、Rerank 等）提供统一的重试机制
 """
 import time
-import asyncio
 import functools
-from typing import Callable, TypeVar, Any
+from typing import Callable, TypeVar
 
 from app.core.logger import logger
 
 T = TypeVar("T")
 
 
-def _sleep_async_aware(delay: float):
+def _sleep_between_retries(delay: float):
     """
-    根据当前是否在事件循环中，选择异步或同步 sleep
-    在异步上下文中使用 asyncio.sleep，避免阻塞事件循环
+    重试间隔等待（同步阻塞 sleep）
+
+    with_retry 包装的是同步阻塞函数，等待本身无法真正异步化。
+    此前实现在事件循环线程中使用 run_coroutine_threadsafe + future.result()
+    等待 asyncio.sleep，会在同一线程上相互等待（等待事件循环调度协程，
+    而事件循环又被本线程阻塞），必然死锁直至超时（delay+5s）后抛出
+    TimeoutError，导致每次重试都空等且多消耗一轮重试。
+    统一改为 time.sleep，行为正确且无额外开销。
     """
-    try:
-        loop = asyncio.get_running_loop()
-        if loop.is_running():
-            # 在事件循环中，使用 run_in_executor 避免阻塞
-            future = asyncio.run_coroutine_threadsafe(
-                asyncio.sleep(delay), loop
-            )
-            future.result(timeout=delay + 5)
-            return
-    except RuntimeError:
-        pass
-    # 同步上下文，直接 sleep
     time.sleep(delay)
 
 
@@ -64,7 +57,7 @@ def with_retry(
                         f"{func.__name__} 第 {attempt + 1}/{max_retries} 次重试，"
                         f"{delay:.1f}s 后执行，错误: {e}"
                     )
-                    _sleep_async_aware(delay)
+                    _sleep_between_retries(delay)
             raise last_exception
         return wrapper
     return decorator
