@@ -21,16 +21,10 @@ def _get_collection():
 
 
 def compute_content_hash(file_path: str) -> str:
-    """计算文件内容的 MD5 哈希"""
+    """计算文件内容的 MD5 哈希（hashlib.file_digest 内部按大块读取，减少大文件的 IO 次数）"""
     try:
-        h = hashlib.md5()
         with open(file_path, "rb") as f:
-            while True:
-                chunk = f.read(8192)
-                if not chunk:
-                    break
-                h.update(chunk)
-        return h.hexdigest()
+            return hashlib.file_digest(f, "md5").hexdigest()
     except Exception as e:
         logger.error(f"计算文件哈希失败: {file_path}, {e}")
         return ""
