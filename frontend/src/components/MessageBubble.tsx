@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeHighlight from 'rehype-highlight'
@@ -30,7 +30,9 @@ function CodeBlockCopyButton({ code }: { code: string }) {
   )
 }
 
-export default function MessageBubble({ msg, streaming }: { msg: ChatMessage; streaming?: boolean }) {
+// memo 化：流式输出期间 ChatPage 每个 token 都会重渲，
+// 历史消息的 msg 对象引用不变，跳过 ReactMarkdown 重复解析
+function MessageBubble({ msg, streaming }: { msg: ChatMessage; streaming?: boolean }) {
   const isUser = msg.role === 'user'
   const textRef = useRef<HTMLDivElement>(null)
 
@@ -112,3 +114,5 @@ export default function MessageBubble({ msg, streaming }: { msg: ChatMessage; st
     </div>
   )
 }
+
+export default memo(MessageBubble)
