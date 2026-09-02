@@ -213,7 +213,7 @@ export default function ChatPage() {
           <>
             {messages.map((msg) => (
               <MessageBubble key={msg.id || nextMsgId()} msg={msg} />
-            ))}}
+            ))}
             {(showTyping || waiting) && <ThinkingProcess />}
             {showTyping && <TypingIndicator />}
             {progressNodes.running.length > 0 && (
