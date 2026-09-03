@@ -293,6 +293,8 @@ cd frontend && npm run dev
 | GET | `/api/query/history/{session_id}` | 获取对话历史 |
 | DELETE | `/api/query/history/{session_id}` | 清空对话历史 |
 | GET | `/api/query/health` | 健康检查 |
+| GET | `/api/health` | 全链路健康聚合（并发探活 Mongo/Milvus/MinIO/Kafka，演进5） |
+| GET | `/metrics` | Prometheus 文本格式指标（请求计数/耗时/SSE 队列，演进5） |
 
 ### 文档预览 API
 

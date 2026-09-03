@@ -14,7 +14,9 @@ from fastapi import HTTPException
 from app.core.logger import logger
 from app.conf.settings import settings
 from app.core.error_handlers import register_error_handlers
-from app.core.response import fail
+from app.core.observability import ObservabilityMiddleware, register_metrics_endpoint
+from app.core.health import collect_health
+from app.core.response import fail, ok
 from app.import_process.api.file_import_service import router as import_router
 from app.import_process.api.document_preview_service import router as document_router
 from app.import_process.api.document_event_service import router as document_event_router
@@ -85,6 +87,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 可观测性中间件：RequestID 链路追踪 + 请求指标 + 访问日志（演进5）
+app.add_middleware(ObservabilityMiddleware)
+
+# /metrics：Prometheus 文本格式指标端点
+register_metrics_endpoint(app)
+
+
+@app.get("/api/health", tags=["health"])
+async def health_overview():
+    """全链路健康聚合：并发探活 Mongo/Milvus/MinIO/Kafka，永不抛错"""
+    return ok(collect_health())
+
 
 # 注册后端 API 路由
 app.include_router(import_router, prefix="/api")

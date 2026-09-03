@@ -14,11 +14,18 @@ from app.conf.settings import settings
 # 延迟导入 aiokafka，避免未安装时启动崩溃
 _producer = None
 _aiokafka = None
+# 生产者状态：unknown / running / failed / stopped（健康检查用）
+_producer_state = "unknown"
+
+
+def get_producer_state() -> str:
+    """返回生产者当前状态（unknown=尚未初始化）"""
+    return _producer_state
 
 
 async def _get_producer():
     """延迟初始化 Kafka 生产者单例"""
-    global _producer, _aiokafka
+    global _producer, _aiokafka, _producer_state
     if _producer is not None:
         return _producer
 
@@ -40,10 +47,12 @@ async def _get_producer():
             request_timeout_ms=10000,
         )
         await _producer.start()
+        _producer_state = "running"
         logger.info(f"Kafka 生产者连接成功: {settings.kafka_bootstrap_servers}")
     except Exception as e:
         logger.error(f"Kafka 生产者连接失败: {e}")
         _producer = None
+        _producer_state = "failed"
         return None
 
     return _producer
@@ -105,7 +114,7 @@ async def publish_document_event(
 
 async def close_producer():
     """关闭 Kafka 生产者"""
-    global _producer
+    global _producer, _producer_state
     if _producer is not None:
         try:
             await _producer.stop()
@@ -114,3 +123,4 @@ async def close_producer():
             logger.error(f"关闭 Kafka 生产者异常: {e}")
         finally:
             _producer = None
+            _producer_state = "stopped"

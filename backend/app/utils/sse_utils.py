@@ -9,6 +9,7 @@ import time
 from enum import Enum
 from typing import Dict, Any, Optional
 from app.core.logger import logger
+from app.core import metrics
 
 __all__ = [
     "SSEEvent",
@@ -52,6 +53,7 @@ def create_sse_queue(session_id: str, loop: Optional[asyncio.AbstractEventLoop] 
     _sse_queues[session_id] = asyncio.Queue()
     _sse_loops[session_id] = loop
     _sse_create_times[session_id] = time.time()
+    metrics.set_gauge("sse_active_queues", len(_sse_queues))
     logger.info(f"SSE 队列创建: {session_id}")
 
 
@@ -156,6 +158,7 @@ async def sse_generator(session_id: str, request=None):
     _sse_loops.pop(session_id, None)
     _sse_create_times.pop(session_id, None)
     _sse_active_consumers.discard(session_id)
+    metrics.set_gauge("sse_active_queues", len(_sse_queues))
     logger.info(f"SSE 队列清理: {session_id}")
 
     # 顺便清理其他陈旧队列
@@ -178,4 +181,6 @@ def cleanup_stale_queues():
         _sse_loops.pop(sid, None)
         _sse_create_times.pop(sid, None)
         logger.warning(f"清理被遗弃的 SSE 队列: {sid}")
+    if stale_ids:
+        metrics.set_gauge("sse_active_queues", len(_sse_queues))
     return len(stale_ids)
