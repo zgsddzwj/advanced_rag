@@ -123,6 +123,11 @@ advanced_rag/
 │   │   │   ├── chat_history_repository.py  #  对话历史仓储
 │   │   │   ├── document_meta_repository.py #  文档元数据仓储
 │   │   │   └── milvus_repository.py     #     Milvus chunks/item_names 仓储
+│   │   ├── services/                    #   服务层 (演进4: 用例编排)
+│   │   │   ├── import_service.py        #     导入用例 (上传校验/任务编排/事件发布)
+│   │   │   ├── query_service.py         #     问答用例 (SSE 编排/后台执行/历史)
+│   │   │   └── document_service.py      #     文档用例 (预览/删除/重导入)
+│   │   ├── dependencies.py              #   FastAPI 依赖注入提供者 (Depends)
 │   │   ├── clients/                     #   基础设施客户端
 │   │   │   ├── milvus_utils.py          #     Milvus 连接 + 集合创建 + 混合搜索
 │   │   │   ├── minio_utils.py           #     MinIO 文件操作
