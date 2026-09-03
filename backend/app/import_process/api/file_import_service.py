@@ -9,8 +9,10 @@ import re
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks, HTTPException
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks
 
+from app.core.exceptions import FileValidationError
+from app.core.response import ok
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
 from app.utils.task_utils import (
@@ -58,15 +60,14 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
     """
     # 校验文件名和扩展名
     if not file.filename:
-        raise HTTPException(status_code=400, detail="文件名不能为空")
+        raise FileValidationError("文件名不能为空")
 
     safe_filename = _sanitize_filename(file.filename)
     file_ext = os.path.splitext(safe_filename)[1].lower()
 
     if file_ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的文件格式: {file_ext}，仅支持 {', '.join(ALLOWED_EXTENSIONS)}"
+        raise FileValidationError(
+            f"不支持的文件格式: {file_ext}，仅支持 {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
     # 生成唯一 task_id
@@ -79,9 +80,9 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            status_code=413,
-            detail=f"文件大小超过限制: {len(content) / 1024 / 1024:.1f}MB > {MAX_FILE_SIZE / 1024 / 1024:.0f}MB"
+        raise FileValidationError(
+            f"文件大小超过限制: {len(content) / 1024 / 1024:.1f}MB > {MAX_FILE_SIZE / 1024 / 1024:.0f}MB",
+            code="FILE_TOO_LARGE",
         )
 
     with open(saved_path, "wb") as f:
@@ -97,25 +98,25 @@ async def upload_file(background_tasks: BackgroundTasks, file: UploadFile = File
     # 后台执行导入流程
     background_tasks.add_task(_run_import, task_id, str(saved_path), str(output_dir))
 
-    return {"task_id": task_id, "filename": safe_filename, "status": "processing"}
+    return ok({"task_id": task_id, "filename": safe_filename, "status": "processing"})
 
 
 @router.get("/status/{task_id}")
 async def get_import_status(task_id: str):
     """查询导入任务状态"""
     status = get_task_status(task_id)
-    return {
+    return ok({
         "task_id": task_id,
         "status": status,
         "done_list": get_done_task_list(task_id),
         "running_list": get_running_task_list(task_id)
-    }
+    })
 
 
 @router.get("/health")
 async def health():
     """导入服务健康检查"""
-    return {"status": "ok", "service": "import"}
+    return ok({"status": "ok", "service": "import"})
 
 
 def _run_import(task_id: str, file_path: str, output_dir: str):

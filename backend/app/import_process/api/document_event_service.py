@@ -9,6 +9,8 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
 
+from app.core.exceptions import NotFoundError
+from app.core.response import ok
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
 from app.clients.document_meta_utils import get_metadata, compute_content_hash
@@ -51,7 +53,7 @@ async def delete_document(file_title: str):
                     limit=1,
                 )
                 if not results:
-                    return {"error": "文档不存在", "file_title": file_title}
+                    raise NotFoundError(f"文档不存在: {file_title}")
         except Exception as e:
             logger.warning(f"检查 Milvus 文档存在性失败: {e}")
 
@@ -63,12 +65,12 @@ async def delete_document(file_title: str):
     )
 
     logger.info(f"文档删除事件已发布: {file_title}, event_id={event_id}")
-    return {
+    return ok({
         "file_title": file_title,
         "status": "deleting",
         "event_id": event_id,
         "message": "删除请求已提交，Kafka 消费者将异步处理",
-    }
+    })
 
 
 @router.post("/reimport/{file_title:path}")
@@ -103,13 +105,13 @@ async def reimport_document(file_title: str, file: UploadFile = File(...)):
     )
 
     logger.info(f"文档重新导入事件已发布: {file_title}, type={event_type}")
-    return {
+    return ok({
         "file_title": file_title,
         "status": "processing",
         "event_type": event_type,
         "content_hash": content_hash[:12],
         "message": "重新导入请求已提交，Kafka 消费者将异步处理",
-    }
+    })
 
 
 @router.get("/meta/list")
@@ -117,4 +119,4 @@ async def list_document_meta():
     """列出所有文档的元数据（含同步状态）"""
     from app.clients.document_meta_utils import list_all_metadata
     docs = list_all_metadata()
-    return {"documents": docs, "total": len(docs)}
+    return ok({"documents": docs, "total": len(docs)})

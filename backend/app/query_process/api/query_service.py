@@ -5,10 +5,11 @@
 import uuid
 import threading
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, field_validator
 
+from app.core.response import ok
 from app.core.logger import logger
 from app.utils.sse_utils import create_sse_queue, sse_generator, push_to_session, SSEEvent
 from app.utils.task_utils import (
@@ -60,7 +61,7 @@ async def ask(req: QueryRequest):
     )
     thread.start()
 
-    return {"session_id": session_id, "task_id": task_id, "status": "processing"}
+    return ok({"session_id": session_id, "task_id": task_id, "status": "processing"})
 
 
 @router.get("/stream/{task_id}")
@@ -91,32 +92,32 @@ async def get_history(session_id: str):
             "image_urls": msg.get("image_urls", []),
             "ts": msg.get("ts", 0),
         })
-    return {"session_id": session_id, "messages": result}
+    return ok({"session_id": session_id, "messages": result})
 
 
 @router.delete("/history/{session_id}")
 async def delete_history(session_id: str):
     """清空对话历史"""
     count = clear_history(session_id)
-    return {"session_id": session_id, "deleted": count}
+    return ok({"session_id": session_id, "deleted": count})
 
 
 @router.get("/status/{task_id}")
 async def get_query_status(task_id: str):
     """查询任务状态"""
     status = get_task_status(task_id)
-    return {
+    return ok({
         "task_id": task_id,
         "status": status,
         "done_list": get_done_task_list(task_id),
         "running_list": get_running_task_list(task_id),
-    }
+    })
 
 
 @router.get("/health")
 async def health():
     """健康检查"""
-    return {"status": "ok", "service": "query"}
+    return ok({"status": "ok", "service": "query"})
 
 
 def _run_query(task_id: str, session_id: str, query: str):

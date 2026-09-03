@@ -74,7 +74,6 @@ export interface DocumentItem {
 export interface DocumentListResponse {
   documents: DocumentItem[]
   total: number
-  error?: string
 }
 
 export interface ChunkItem {
@@ -90,7 +89,6 @@ export interface ChunkListResponse {
   file_title: string
   chunks: ChunkItem[]
   total: number
-  error?: string
 }
 
 // ==================== 思考过程 SSE ====================

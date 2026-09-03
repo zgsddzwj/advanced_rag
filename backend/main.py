@@ -13,6 +13,8 @@ from fastapi import HTTPException
 
 from app.core.logger import logger
 from app.conf.settings import settings
+from app.core.error_handlers import register_error_handlers
+from app.core.response import fail
 from app.import_process.api.file_import_service import router as import_router
 from app.import_process.api.document_preview_service import router as document_router
 from app.import_process.api.document_event_service import router as document_event_router
@@ -70,6 +72,9 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="NexusRAG", lifespan=lifespan)
 
+# 统一异常处理：业务异常 / 校验异常 / 未捕获异常 → 统一响应信封
+register_error_handlers(app)
+
 # CORS 中间件：允许开发模式下 Vite 开发服务器跨域访问
 app.add_middleware(
     CORSMiddleware,
@@ -124,16 +129,16 @@ async def documents_page():
 async def spa_fallback(request: Request, exc: HTTPException):
     """SPA 路由回退：非 API 路径的 404 返回 index.html，支持前端客户端路由"""
     path = request.url.path
-    # API 路径返回标准 JSON 404
+    # API 路径返回标准信封 404
     if path.startswith("/api/"):
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return JSONResponse(status_code=404, content=fail("NOT_FOUND", "Not Found"))
     # 前端静态资源路径返回标准 404
     if path.startswith("/assets/"):
-        return JSONResponse(status_code=404, content={"detail": "Asset Not Found"})
+        return JSONResponse(status_code=404, content=fail("NOT_FOUND", "Asset Not Found"))
     # 其他路径回退到 index.html（SPA 客户端路由）
     if FRONTEND_DIST.exists():
         return FileResponse(str(FRONTEND_DIST / "index.html"))
-    return JSONResponse(status_code=404, content={"detail": "Not Found"})
+    return JSONResponse(status_code=404, content=fail("NOT_FOUND", "Not Found"))
 
 
 if __name__ == "__main__":

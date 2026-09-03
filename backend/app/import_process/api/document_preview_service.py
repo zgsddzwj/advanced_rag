@@ -6,6 +6,8 @@ from typing import List, Dict, Any
 
 from fastapi import APIRouter, Query
 
+from app.core.exceptions import UpstreamServiceError
+from app.core.response import ok
 from app.core.logger import logger
 from app.clients.milvus_utils import get_milvus_client
 from app.utils.escape_milvus_string_utils import escape_milvus_string
@@ -26,7 +28,7 @@ async def list_documents():
         collection_name = settings.chunks_collection
 
         if not client.has_collection(collection_name=collection_name):
-            return {"documents": [], "total": 0}
+            return ok({"documents": [], "total": 0})
 
         client.load_collection(collection_name=collection_name)
 
@@ -39,7 +41,7 @@ async def list_documents():
         )
 
         if not all_data:
-            return {"documents": [], "total": 0}
+            return ok({"documents": [], "total": 0})
 
         # 按 file_title 聚合
         doc_map: Dict[str, Dict[str, Any]] = {}
@@ -58,11 +60,13 @@ async def list_documents():
                 doc_map[ft]["titles"].append(title)
 
         documents = list(doc_map.values())
-        return {"documents": documents, "total": len(documents)}
+        return ok({"documents": documents, "total": len(documents)})
 
+    except UpstreamServiceError:
+        raise
     except Exception as e:
         logger.error(f"获取文档列表失败: {str(e)}", exc_info=True)
-        return {"documents": [], "total": 0, "error": str(e)}
+        raise UpstreamServiceError("获取文档列表失败", upstream="milvus", details={"error": str(e)})
 
 
 @router.get("/chunks/{file_title:path}")
@@ -76,7 +80,7 @@ async def get_document_chunks(file_title: str, limit: int = Query(500, ge=1, le=
         collection_name = settings.chunks_collection
 
         if not client.has_collection(collection_name=collection_name):
-            return {"file_title": file_title, "chunks": [], "total": 0}
+            return ok({"file_title": file_title, "chunks": [], "total": 0})
 
         client.load_collection(collection_name=collection_name)
 
@@ -92,12 +96,14 @@ async def get_document_chunks(file_title: str, limit: int = Query(500, ge=1, le=
         # 按 part 排序
         chunks.sort(key=lambda x: x.get("part", 0))
 
-        return {
+        return ok({
             "file_title": file_title,
             "chunks": chunks,
             "total": len(chunks),
-        }
+        })
 
+    except UpstreamServiceError:
+        raise
     except Exception as e:
         logger.error(f"获取文档切分详情失败: {str(e)}", exc_info=True)
-        return {"file_title": file_title, "chunks": [], "total": 0, "error": str(e)}
+        raise UpstreamServiceError("获取文档切分详情失败", upstream="milvus", details={"error": str(e)})
