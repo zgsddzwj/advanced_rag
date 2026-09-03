@@ -1,6 +1,7 @@
 """
 RRF 融合节点（节点5）
 对向量检索、HyDE 检索、网络搜索三路结果进行 RRF（Reciprocal Rank Fusion）融合排序
+融合参数（k / 输出上限）支持按请求配置（演进7）
 """
 import sys
 import hashlib
@@ -8,13 +9,14 @@ from typing import List, Dict, Any
 
 from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
+from app.query_process.agent.retrieval_config import get_retrieval_config
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
 
-# RRF 参数 k：平滑因子，通常取 60
-RRF_K = 60
-# RRF 融合后返回的最大数量
-RRF_OUTPUT_LIMIT = 15
+# RRF 参数 k 的历史默认值（可被 RetrievalConfig.rrf_k 覆盖）
+DEFAULT_RRF_K = 60
+# RRF 融合后返回的最大数量（可被 RetrievalConfig.rrf_output_limit 覆盖）
+DEFAULT_RRF_OUTPUT_LIMIT = 15
 
 
 def node_rrf(state: QueryGraphState) -> QueryGraphState:
@@ -26,6 +28,7 @@ def node_rrf(state: QueryGraphState) -> QueryGraphState:
     push_thinking_start(state["task_id"], func_name, is_stream)
 
     try:
+        config = get_retrieval_config(state)
         embedding_chunks = state.get("embedding_chunks", [])
         hyde_chunks = state.get("hyde_chunks", [])
         web_search_docs = state.get("web_search_docs", [])
@@ -34,13 +37,14 @@ def node_rrf(state: QueryGraphState) -> QueryGraphState:
                     f"HyDE {len(hyde_chunks)} 条, 网络搜索 {len(web_search_docs)} 条")
 
         # RRF 融合
-        fused = _rrf_fuse(embedding_chunks, hyde_chunks, web_search_docs)
-
-        # 截取前 N 条
-        fused = fused[:RRF_OUTPUT_LIMIT]
+        fused = _rrf_fuse(
+            embedding_chunks, hyde_chunks, web_search_docs,
+            rrf_k=config.rrf_k,
+            output_limit=config.rrf_output_limit,
+        )
         state["rrf_chunks"] = fused
 
-        logger.info(f"RRF 融合完成: 返回 {len(fused)} 条结果")
+        logger.info(f"RRF 融合完成: 返回 {len(fused)} 条结果 (k={config.rrf_k})")
         if fused:
             logger.info(f"Top1 RRF score: {fused[0].get('rrf_score', 0):.6f}")
 
@@ -57,6 +61,8 @@ def _rrf_fuse(
     embedding_chunks: List[Dict[str, Any]],
     hyde_chunks: List[Dict[str, Any]],
     web_search_docs: List[Dict[str, Any]],
+    rrf_k: int = DEFAULT_RRF_K,
+    output_limit: int = DEFAULT_RRF_OUTPUT_LIMIT,
 ) -> List[Dict[str, Any]]:
     """
     RRF 融合算法
@@ -70,14 +76,14 @@ def _rrf_fuse(
         (hyde_chunks, "hyde"),
         (web_search_docs, "web"),
     ):
-        _accumulate_scores(scores, chunks, source_name)
+        _accumulate_scores(scores, chunks, source_name, rrf_k)
 
     # 按分数降序排序
     sorted_items = sorted(scores.values(), key=lambda x: x["score"], reverse=True)
 
     # 构建输出
     result = []
-    for item in sorted_items:
+    for item in sorted_items[:output_limit]:
         chunk = item["chunk"].copy()
         chunk["rrf_score"] = round(item["score"], 6)
         chunk["sources"] = list(item["sources"])
@@ -90,13 +96,14 @@ def _accumulate_scores(
     scores: Dict[str, Dict[str, Any]],
     chunks: List[Dict[str, Any]],
     source_name: str,
+    rrf_k: int,
 ) -> None:
     """对单路检索结果累加 RRF 分数"""
     for rank, chunk in enumerate(chunks):
         key = _get_chunk_key(chunk)
         if key not in scores:
             scores[key] = {"chunk": chunk, "score": 0.0, "sources": set()}
-        scores[key]["score"] += 1.0 / (RRF_K + rank + 1)
+        scores[key]["score"] += 1.0 / (rrf_k + rank + 1)
         scores[key]["sources"].add(source_name)
 
 

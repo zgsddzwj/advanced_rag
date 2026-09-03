@@ -3,9 +3,11 @@
 提供智能问答的 REST API，支持 SSE 流式输出
 业务逻辑委托 QueryService
 """
+from typing import Optional
+
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.response import ok
 from app.dependencies import get_query_service
@@ -18,10 +20,25 @@ from app.utils.task_utils import (
 router = APIRouter(prefix="/query", tags=["query"])
 
 
+class RetrievalOptions(BaseModel):
+    """
+    按请求检索策略（演进7）：全部字段可选，缺省沿用服务端默认值
+    """
+    enable_hyde: Optional[bool] = Field(None, description="是否执行 HyDE 补充检索")
+    enable_web_search: Optional[bool] = Field(
+        None, description="联网搜索三态开关：缺省=按结果数自动判断"
+    )
+    top_k: Optional[int] = Field(None, ge=1, le=30, description="每路检索返回文档数")
+    rrf_k: Optional[int] = Field(None, ge=1, le=1000, description="RRF 平滑因子")
+    rrf_output_limit: Optional[int] = Field(None, ge=1, le=50, description="RRF 融合后数量上限")
+    web_search_count: Optional[int] = Field(None, ge=1, le=20, description="联网搜索结果数")
+
+
 class QueryRequest(BaseModel):
     """查询请求"""
     query: str
     session_id: str = ""
+    retrieval: Optional[RetrievalOptions] = None
 
     @field_validator("query")
     @classmethod
@@ -40,8 +57,10 @@ async def ask(req: QueryRequest, service: QueryService = Depends(get_query_servi
     """
     提交查询，返回 session_id 和 task_id
     前端通过 /query/stream/{task_id} 接收 SSE 流式回答
+    retrieval 可选携带检索策略（HyDE/联网搜索开关、top_k、RRF 参数）
     """
-    return ok(service.ask(req.query, req.session_id))
+    retrieval_config = req.retrieval.model_dump(exclude_none=True) if req.retrieval else {}
+    return ok(service.ask(req.query, req.session_id, retrieval_config=retrieval_config))
 
 
 @router.get("/stream/{task_id}")

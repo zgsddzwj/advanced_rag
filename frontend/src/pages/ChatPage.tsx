@@ -37,6 +37,9 @@ export default function ChatPage() {
   const [streamingText, setStreamingText] = useState('')
   const [showTyping, setShowTyping] = useState(false)
   const [progressNodes, setProgressNodes] = useState<{ done: string[]; running: string[] }>({ done: [], running: [] })
+  // 检索策略（演进7）：HyDE 开关 + 联网搜索三态（auto=按结果数自动判断）
+  const [enableHyde, setEnableHyde] = useState(true)
+  const [webSearchMode, setWebSearchMode] = useState<'auto' | 'on' | 'off'>('auto')
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sseRef = useRef<EventSource | null>(null)
@@ -103,7 +106,11 @@ export default function ChatPage() {
     setMessages(prev => [...prev, { id: nextMsgId(), role: 'user', text: q }])
 
     try {
-      const data = await ask(q, sessionId)
+      const retrieval = {
+        enable_hyde: enableHyde,
+        enable_web_search: webSearchMode === 'auto' ? undefined : webSearchMode === 'on',
+      }
+      const data = await ask(q, sessionId, retrieval)
       setSessionId(data.session_id)
       localStorage.setItem('kb_session_id', data.session_id)
 
@@ -231,6 +238,30 @@ export default function ChatPage() {
 
       {/* 输入区域 */}
       <div className="px-8 py-4 bg-white border-t border-gray-100">
+        {/* 检索策略开关（演进7） */}
+        <div className="flex items-center gap-4 mb-2 text-xs text-gray-500">
+          <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={enableHyde}
+              onChange={e => setEnableHyde(e.target.checked)}
+              className="accent-indigo-500"
+            />
+            HyDE 补充检索
+          </label>
+          <label className="inline-flex items-center gap-1.5 select-none">
+            联网搜索
+            <select
+              value={webSearchMode}
+              onChange={e => setWebSearchMode(e.target.value as 'auto' | 'on' | 'off')}
+              className="border border-gray-200 rounded px-1 py-0.5 text-xs text-gray-600 focus:outline-none focus:border-indigo-300"
+            >
+              <option value="auto">自动判断</option>
+              <option value="on">强制开启</option>
+              <option value="off">关闭</option>
+            </select>
+          </label>
+        </div>
         <div className="flex gap-3 items-end">
           <textarea
             ref={inputRef}

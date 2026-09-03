@@ -10,6 +10,7 @@ import type {
   SSEThinkingData,
   DocumentListResponse,
   ChunkListResponse,
+  RetrievalOptions,
 } from '@/types'
 
 const API_BASE = '/api'
@@ -70,11 +71,15 @@ export async function getImportStatus(taskId: string): Promise<ImportStatusRespo
 
 // ==================== 查询 API ====================
 
-export async function ask(query: string, sessionId = ''): Promise<AskResponse> {
+export async function ask(query: string, sessionId = '', retrieval?: RetrievalOptions): Promise<AskResponse> {
+  const body: Record<string, unknown> = { query, session_id: sessionId }
+  if (retrieval && Object.values(retrieval).some(v => v !== undefined)) {
+    body.retrieval = retrieval
+  }
   return request<AskResponse>('/query/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, session_id: sessionId }),
+    body: JSON.stringify(body),
   })
 }
 

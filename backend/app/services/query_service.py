@@ -28,10 +28,11 @@ class QueryService:
 
     # ---------- 提问 ----------
 
-    def ask(self, query: str, session_id: str = "") -> dict:
+    def ask(self, query: str, session_id: str = "", retrieval_config: dict | None = None) -> dict:
         """
         提交查询：创建 SSE 队列并启动后台线程执行检索图
         前端通过 /query/stream/{task_id} 接收流式回答
+        :param retrieval_config: 按请求检索策略（RetrievalConfig 字典，演进7）
         """
         session_id = session_id or str(uuid.uuid4())[:8]
         task_id = str(uuid.uuid4())[:8]
@@ -41,14 +42,14 @@ class QueryService:
 
         thread = threading.Thread(
             target=self.run_query,
-            args=(task_id, session_id, query),
+            args=(task_id, session_id, query, retrieval_config or {}),
             daemon=True,
         )
         thread.start()
 
         return {"session_id": session_id, "task_id": task_id, "status": "processing"}
 
-    def run_query(self, task_id: str, session_id: str, query: str):
+    def run_query(self, task_id: str, session_id: str, query: str, retrieval_config: dict | None = None):
         """后台线程执行查询流程"""
         update_task_status(task_id, TASK_STATUS_PROCESSING)
 
@@ -61,6 +62,7 @@ class QueryService:
                 session_id=session_id,
                 query=query,
                 is_stream=True,
+                retrieval_config=retrieval_config or {},
             )
 
             logger.info(f"查询流程启动: task_id={task_id}, session_id={session_id}, query={query[:50]}")

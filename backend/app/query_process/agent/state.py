@@ -37,6 +37,9 @@ class QueryGraphState(TypedDict):
     need_web_search: bool
     is_stream: bool
 
+    # 检索策略配置（演进7）：RetrievalConfig 的字典形式，按请求可插拔
+    retrieval_config: dict
+
 
 graph_default_state: QueryGraphState = {
     "session_id": "",
@@ -56,6 +59,7 @@ graph_default_state: QueryGraphState = {
     "prompt": "",
     "need_web_search": False,
     "is_stream": False,
+    "retrieval_config": {},
 }
 
 

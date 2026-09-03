@@ -1,9 +1,8 @@
 """
 HyDE 假设性文档检索节点（节点3）
 1. LLM 生成假设性回答
-2. 向量化假设性回答
-3. Dense + BM25 混合检索
-4. 判断是否需要网络搜索
+2. 通过检索器注册表对假设性回答执行混合检索
+3. 三态联网搜索决策：配置强制开/关，或按检索结果数量自动判断（演进7）
 """
 import sys
 from typing import List, Dict
@@ -14,21 +13,11 @@ from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
 from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
-from app.lm.embedding_utils import generate_embedding
-from app.clients.milvus_utils import (
-    get_milvus_client,
-    create_hybrid_search_requests,
-    hybrid_search,
-    ensure_collection_loaded,
-)
-from app.query_process.agent.search_utils import build_filter_expr, normalize_results
+from app.query_process.agent.retrievers import get_retriever
+from app.query_process.agent.retrieval_config import get_retrieval_config
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
-from app.conf.settings import settings
 
-# HyDE 检索参数
-HYDE_SEARCH_LIMIT = 15
-HYDE_OUTPUT_LIMIT = 10
 # 判断需要网络搜索的阈值：总结果数低于此值则触发网络搜索
 MIN_RESULTS_THRESHOLD = 5
 # 假设性回答最大长度
@@ -43,79 +32,60 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
     add_running_task(state["task_id"], func_name, is_stream)
     push_thinking_start(state["task_id"], func_name, is_stream)
 
+    config = get_retrieval_config(state)
+
     try:
         query = state.get("rewritten_query") or state.get("query", "")
         if not query:
             logger.warning("查询文本为空，跳过 HyDE 检索")
             state["hyde_chunks"] = []
-            state["need_web_search"] = True
+            state["need_web_search"] = _decide_web_search(config, 0)
             return state
 
-        # Step 1: LLM 生成假设性回答
-        hyde_text = _generate_hyde_text(query)
-        state["hyde_text"] = hyde_text
-        logger.info(f"HyDE 假设性回答生成完成，长度: {len(hyde_text)}")
+        hyde_chunks: List[Dict] = []
+        if config.enable_hyde:
+            # Step 1: LLM 生成假设性回答
+            hyde_text = _generate_hyde_text(query)
+            state["hyde_text"] = hyde_text
+            logger.info(f"HyDE 假设性回答生成完成，长度: {len(hyde_text)}")
 
-        collection_name = settings.chunks_collection
-        client = get_milvus_client()
+            # Step 2: 检索器执行混合检索
+            retriever = get_retriever("hyde")
+            hyde_chunks = retriever.retrieve(
+                query=hyde_text,
+                item_names=state.get("item_names", []),
+                top_k=config.top_k,
+            )
+        else:
+            logger.info("HyDE 检索已按请求配置禁用")
 
-        # 集合不存在则跳过
-        if not client.has_collection(collection_name=collection_name):
-            logger.warning(f"集合 {collection_name} 不存在，跳过 HyDE 检索")
-            state["hyde_chunks"] = []
-            state["need_web_search"] = True
-            return state
+        state["hyde_chunks"] = hyde_chunks
 
-        ensure_collection_loaded(client, collection_name)
-
-        # Step 2: 向量化假设性回答
-        dense_vector = generate_embedding(hyde_text)
-
-        # Step 3: 构造过滤表达式
-        expr = build_filter_expr(state.get("item_names", []))
-
-        # Step 4: 构造混合搜索请求
-        reqs = create_hybrid_search_requests(
-            dense_vector=dense_vector,
-            query_text=hyde_text,
-            expr=expr,
-            limit=HYDE_SEARCH_LIMIT,
-        )
-
-        # Step 5: 执行混合检索
-        results = hybrid_search(
-            client=client,
-            collection_name=collection_name,
-            reqs=reqs,
-            limit=HYDE_OUTPUT_LIMIT,
-            output_fields=[
-                "chunk_id", "content", "title", "parent_title",
-                "part", "file_title", "item_name",
-            ],
-        )
-
-        # Step 6: 规范化结果
-        chunks = normalize_results(results, source="hyde")
-        state["hyde_chunks"] = chunks
-
-        # Step 7: 判断是否需要网络搜索
+        # Step 3: 联网搜索决策
         embedding_chunks = state.get("embedding_chunks", [])
-        total_unique = _count_unique_chunks(embedding_chunks, chunks)
-        need_web = total_unique < MIN_RESULTS_THRESHOLD
+        total_unique = _count_unique_chunks(embedding_chunks, hyde_chunks)
+        need_web = _decide_web_search(config, total_unique)
         state["need_web_search"] = need_web
 
-        logger.info(f"HyDE 检索完成: 返回 {len(chunks)} 条结果，"
+        logger.info(f"HyDE 检索完成: 返回 {len(hyde_chunks)} 条结果，"
                     f"总唯一结果 {total_unique} 条，"
                     f"需要网络搜索: {need_web}")
 
     except Exception as e:
         logger.error(f"HyDE 检索失败: {str(e)}", exc_info=True)
         state["hyde_chunks"] = []
-        state["need_web_search"] = True
+        state["need_web_search"] = _decide_web_search(config, 0)
     finally:
         add_done_task(state["task_id"], func_name, is_stream)
 
     return state
+
+
+def _decide_web_search(config, total_unique: int) -> bool:
+    """三态联网搜索决策：True=强制，False=禁用，None=按结果数量自动判断"""
+    if config.enable_web_search is not None:
+        return config.enable_web_search
+    return total_unique < MIN_RESULTS_THRESHOLD
 
 
 def _generate_hyde_text(query: str) -> str:

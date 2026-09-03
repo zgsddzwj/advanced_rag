@@ -27,6 +27,16 @@ export interface AskResponse {
   status: string
 }
 
+// 按请求检索策略（演进7）：全部可选，缺省沿用服务端默认
+export interface RetrievalOptions {
+  enable_hyde?: boolean
+  enable_web_search?: boolean
+  top_k?: number
+  rrf_k?: number
+  rrf_output_limit?: number
+  web_search_count?: number
+}
+
 export interface ChatMessage {
   id?: string
   role: 'user' | 'assistant'
