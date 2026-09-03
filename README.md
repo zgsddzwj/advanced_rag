@@ -105,12 +105,13 @@ advanced_rag/
 │   │   ├── core/                        #   核心工具
 │   │   │   ├── logger.py                #     日志 (loguru)
 │   │   │   └── load_prompt.py           #     Prompt 模板加载器
-│   │   ├── conf/                        #   配置层
-│   │   │   ├── lm_config.py             #     AI 模型配置
-│   │   │   ├── milvus_config.py         #     Milvus 配置
-│   │   │   ├── kafka_config.py          #     Kafka 配置
-│   │   │   ├── bailian_mcp_config.py    #     百炼 MCP 配置
-│   │   │   └── mineru_config.py         #     MinerU 配置
+│   │   ├── conf/                        #   配置层（演进1: 统一配置中心）
+│   │   │   ├── settings.py              #     pydantic-settings 统一配置（单一配置源 + 启动校验 + 密钥脱敏）
+│   │   │   ├── lm_config.py             #     [兼容层] AI 模型配置（委托 settings）
+│   │   │   ├── milvus_config.py         #     [兼容层] Milvus 配置（委托 settings）
+│   │   │   ├── kafka_config.py          #     [兼容层] Kafka 配置（委托 settings）
+│   │   │   ├── bailian_mcp_config.py    #     [兼容层] 百炼 MCP 配置（委托 settings）
+│   │   │   └── mineru_config.py         #     [兼容层] MinerU 配置（委托 settings）
 │   │   ├── lm/                          #   AI 模型封装层
 │   │   │   ├── lm_utils.py              #     LLM (Qwen-Plus)
 │   │   │   ├── vlm_utils.py             #     VLM (Qwen-VL-Plus)

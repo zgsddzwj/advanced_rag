@@ -5,8 +5,8 @@
 from typing import List, Dict, Any
 import dashscope
 from app.core.logger import logger
-from app.conf.bailian_mcp_config import bailian_mcp_config
 from app.utils.retry_utils import with_retry
+from app.conf.settings import settings
 
 
 @with_retry(max_retries=2, base_delay=1.0)
@@ -22,8 +22,8 @@ def web_search(query: str, count: int = 5) -> List[Dict[str, Any]]:
         return []
 
     result = dashscope.Application.call(
-        api_key=bailian_mcp_config.DASHSCOPE_API_KEY,
-        app_id=bailian_mcp_config.BAILIAN_MCP_APP_ID,
+        api_key=settings.dashscope_api_key,
+        app_id=settings.bailian_mcp_app_id,
         prompt=query,
     )
 

@@ -8,7 +8,7 @@ from pymilvus import (
     AnnSearchRequest, RRFRanker
 )
 from app.core.logger import logger
-from app.conf.milvus_config import milvus_config
+from app.conf.settings import settings
 
 _milvus_client: Optional[MilvusClient] = None
 # 已加载集合缓存，避免重复调用 load_collection
@@ -19,8 +19,8 @@ def get_milvus_client() -> MilvusClient:
     """获取 Milvus 客户端单例"""
     global _milvus_client
     if _milvus_client is None:
-        _milvus_client = MilvusClient(uri=milvus_config.MILVUS_URL)
-        logger.info(f"Milvus 客户端连接成功: {milvus_config.MILVUS_URL}")
+        _milvus_client = MilvusClient(uri=settings.milvus_url)
+        logger.info(f"Milvus 客户端连接成功: {settings.milvus_url}")
     return _milvus_client
 
 

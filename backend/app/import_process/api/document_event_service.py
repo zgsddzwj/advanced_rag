@@ -14,8 +14,8 @@ from app.utils.path_util import PROJECT_ROOT
 from app.clients.document_meta_utils import get_metadata, compute_content_hash
 from app.clients.kafka_producer import publish_document_event
 from app.clients.milvus_utils import get_milvus_client
-from app.conf.milvus_config import milvus_config
 from app.utils.escape_milvus_string_utils import escape_milvus_string
+from app.conf.settings import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -40,7 +40,7 @@ async def delete_document(file_title: str):
         # 也检查 Milvus 中是否有数据
         try:
             client = get_milvus_client()
-            collection_name = milvus_config.CHUNKS_COLLECTION
+            collection_name = settings.chunks_collection
             if client.has_collection(collection_name=collection_name):
                 client.load_collection(collection_name=collection_name)
                 safe_title = escape_milvus_string(file_title)

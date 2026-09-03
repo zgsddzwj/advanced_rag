@@ -1,36 +1,27 @@
 """
-LLM/VLM/Embedding/Rerank 统一配置
-所有 AI 模型通过阿里云百炼 API 接入
+[兼容层] AI 模型配置
+演进1 后所有配置统一由 app.conf.settings 提供，本模块仅为历史引用保留。
+新代码请使用：from app.conf.settings import settings
 """
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+from app.conf.settings import settings
 
 
 class LMConfig:
-    """AI 模型配置"""
-    # 百炼统一 API Key
-    DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
+    """AI 模型配置（属性委托至统一配置，只读快照）"""
 
-    # LLM (Qwen-Plus)
-    LLM_MODEL = os.getenv("LLM_MODEL_NAME", "qwen-plus")
-    LLM_BASE_URL = os.getenv("LLM_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    DASHSCOPE_API_KEY = settings.dashscope_api_key
 
-    # VLM (Qwen-VL-Plus)
-    VLM_MODEL = os.getenv("VLM_MODEL_NAME", "qwen-vl-plus")
-    VLM_BASE_URL = os.getenv("VLM_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    LLM_MODEL = settings.llm_model_name
+    LLM_BASE_URL = settings.llm_base_url
 
-    # Embedding (text-embedding-v3)
-    EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL_NAME", "text-embedding-v3")
-    EMBEDDING_DIM = int(os.getenv("EMBEDDING_DIMENSION", "1024"))
-    EMBEDDING_BASE_URL = os.getenv("EMBEDDING_BASE_URL",
-        "https://dashscope.aliyuncs.com/compatible-mode/v1")
+    VLM_MODEL = settings.vlm_model_name
+    VLM_BASE_URL = settings.vlm_base_url
 
-    # Rerank (gte-rerank)
-    RERANK_MODEL = os.getenv("RERANK_MODEL_NAME", "gte-rerank")
+    EMBEDDING_MODEL = settings.embedding_model_name
+    EMBEDDING_DIM = settings.embedding_dimension
+    EMBEDDING_BASE_URL = settings.embedding_base_url
+
+    RERANK_MODEL = settings.rerank_model_name
 
 
 lm_config = LMConfig()

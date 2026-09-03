@@ -8,8 +8,8 @@ from fastapi import APIRouter, Query
 
 from app.core.logger import logger
 from app.clients.milvus_utils import get_milvus_client
-from app.conf.milvus_config import milvus_config
 from app.utils.escape_milvus_string_utils import escape_milvus_string
+from app.conf.settings import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -23,7 +23,7 @@ async def list_documents():
     """
     try:
         client = get_milvus_client()
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
 
         if not client.has_collection(collection_name=collection_name):
             return {"documents": [], "total": 0}
@@ -73,7 +73,7 @@ async def get_document_chunks(file_title: str, limit: int = Query(500, ge=1, le=
     """
     try:
         client = get_milvus_client()
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
 
         if not client.has_collection(collection_name=collection_name):
             return {"file_title": file_title, "chunks": [], "total": 0}

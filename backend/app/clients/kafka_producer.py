@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from app.core.logger import logger
-from app.conf.kafka_config import kafka_config
+from app.conf.settings import settings
 
 # 延迟导入 aiokafka，避免未安装时启动崩溃
 _producer = None
@@ -31,7 +31,7 @@ async def _get_producer():
 
     try:
         _producer = aiokafka.AIOKafkaProducer(
-            bootstrap_servers=kafka_config.BOOTSTRAP_SERVERS,
+            bootstrap_servers=settings.kafka_bootstrap_servers,
             value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
             key_serializer=lambda k: k.encode("utf-8") if k else None,
             acks="all",
@@ -40,7 +40,7 @@ async def _get_producer():
             request_timeout_ms=10000,
         )
         await _producer.start()
-        logger.info(f"Kafka 生产者连接成功: {kafka_config.BOOTSTRAP_SERVERS}")
+        logger.info(f"Kafka 生产者连接成功: {settings.kafka_bootstrap_servers}")
     except Exception as e:
         logger.error(f"Kafka 生产者连接失败: {e}")
         _producer = None
@@ -67,7 +67,7 @@ async def publish_document_event(
     :param chunk_count: chunk 数量
     :param item_name: 文档主题
     """
-    if not kafka_config.ENABLED:
+    if not settings.kafka_enabled:
         logger.debug(f"Kafka 未启用，跳过事件发布: {event_type} {file_title}")
         return False
 
@@ -91,7 +91,7 @@ async def publish_document_event(
             return False
 
         await producer.send_and_wait(
-            topic=kafka_config.TOPIC,
+            topic=settings.kafka_topic,
             key=file_title,
             value=event,
         )

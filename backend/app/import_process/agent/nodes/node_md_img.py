@@ -14,9 +14,9 @@ from app.clients.minio_utils import get_minio_client, upload_file
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
 from app.lm.vlm_utils import get_vlm_client
-from app.conf.minio_config import minio_config
 from langchain_core.messages import HumanMessage
 from app.core.logger import logger
+from app.conf.settings import settings
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
 
@@ -168,7 +168,7 @@ def _step_3_generate_summaries(doc_stem: str, targets: List[Tuple[str, str, Tupl
 
 def _step_4_upload_and_replace(doc_stem: str, targets, summaries: Dict[str, str], md_content: str) -> str:
     """并发上传图片至MinIO，替换MD图片路径"""
-    upload_dir = f"{minio_config.IMG_DIR}/{doc_stem}".replace(" ", "")
+    upload_dir = f"{settings.minio_img_dir}/{doc_stem}".replace(" ", "")
 
     # 并发上传图片并获取URL映射
     urls = {}

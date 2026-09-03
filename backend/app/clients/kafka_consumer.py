@@ -15,8 +15,6 @@ import threading
 from typing import Optional
 
 from app.core.logger import logger
-from app.conf.kafka_config import kafka_config
-from app.conf.milvus_config import milvus_config
 from app.clients.milvus_utils import get_milvus_client
 from app.clients.document_meta_utils import (
     mark_status,
@@ -25,6 +23,7 @@ from app.clients.document_meta_utils import (
 )
 from app.utils.escape_milvus_string_utils import escape_milvus_string
 from app.utils.path_util import PROJECT_ROOT
+from app.conf.settings import settings
 
 # 消费者全局状态
 _consumer_task: Optional[asyncio.Task] = None
@@ -40,7 +39,7 @@ async def start_kafka_consumer():
     """启动 Kafka 消费者（在 FastAPI lifespan 中调用）"""
     global _consumer_task
 
-    if not kafka_config.ENABLED:
+    if not settings.kafka_enabled:
         logger.info("Kafka 未启用，消费者不启动")
         return
 
@@ -80,9 +79,9 @@ async def _consume_loop():
             return
         try:
             consumer = aiokafka.AIOKafkaConsumer(
-                kafka_config.TOPIC,
-                bootstrap_servers=kafka_config.BOOTSTRAP_SERVERS,
-                group_id=kafka_config.CONSUMER_GROUP,
+                settings.kafka_topic,
+                bootstrap_servers=settings.kafka_bootstrap_servers,
+                group_id=settings.kafka_consumer_group,
                 value_deserializer=lambda v: json.loads(v.decode("utf-8")),
                 key_deserializer=lambda k: k.decode("utf-8") if k else None,
                 auto_offset_reset="earliest",
@@ -91,7 +90,7 @@ async def _consume_loop():
                 heartbeat_interval_ms=10000,
             )
             await consumer.start()
-            logger.info(f"Kafka 消费者连接成功: {kafka_config.BOOTSTRAP_SERVERS}, topic={kafka_config.TOPIC}")
+            logger.info(f"Kafka 消费者连接成功: {settings.kafka_bootstrap_servers}, topic={settings.kafka_topic}")
             break
         except Exception as e:
             if attempt == 0:
@@ -228,7 +227,7 @@ def _delete_chunks_from_milvus(file_title: str):
     """从 kb_chunks 集合中删除指定 file_title 的所有 chunks"""
     try:
         client = get_milvus_client()
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
 
         if not client.has_collection(collection_name=collection_name):
             logger.warning(f"集合 {collection_name} 不存在，跳过删除")
@@ -251,7 +250,7 @@ def _delete_item_names_from_milvus(file_title: str):
     """从 kb_item_names 集合中删除指定 file_title 的记录"""
     try:
         client = get_milvus_client()
-        collection_name = milvus_config.ITEM_NAMES_COLLECTION
+        collection_name = settings.item_names_collection
 
         if not client.has_collection(collection_name=collection_name):
             logger.warning(f"集合 {collection_name} 不存在，跳过删除")

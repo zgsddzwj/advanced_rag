@@ -5,8 +5,8 @@ Rerank 客户端封装（gte-rerank via 百炼）
 from typing import List, Dict, Any
 import dashscope
 from app.core.logger import logger
-from app.conf.lm_config import lm_config
 from app.utils.retry_utils import with_retry
+from app.conf.settings import settings
 
 
 @with_retry(max_retries=2, base_delay=1.0)
@@ -31,12 +31,12 @@ def rerank_documents(
     texts = [doc.get(text_field, "") for doc in documents]
 
     result = dashscope.TextReRank.call(
-        model=lm_config.RERANK_MODEL,
+        model=settings.rerank_model_name,
         query=query,
         documents=texts,
         top_n=top_n,
         return_documents=False,
-        api_key=lm_config.DASHSCOPE_API_KEY,
+        api_key=settings.dashscope_api_key,
     )
 
     if result.status_code != 200:

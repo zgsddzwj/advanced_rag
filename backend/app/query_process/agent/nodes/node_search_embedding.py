@@ -13,10 +13,10 @@ from app.clients.milvus_utils import (
     hybrid_search,
     ensure_collection_loaded,
 )
-from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import build_filter_expr, normalize_results
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
+from app.conf.settings import settings
 
 # 每路检索返回数量
 SEARCH_LIMIT = 15
@@ -39,7 +39,7 @@ def node_search_embedding(state: QueryGraphState) -> QueryGraphState:
             state["embedding_chunks"] = []
             return state
 
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
         client = get_milvus_client()
 
         # 集合不存在则跳过

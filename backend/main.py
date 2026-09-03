@@ -12,10 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
 
 from app.core.logger import logger
-from app.conf.lm_config import lm_config
-from app.conf.mineru_config import mineru_config
-from app.conf.bailian_mcp_config import bailian_mcp_config
-from app.conf.kafka_config import kafka_config
+from app.conf.settings import settings
 from app.import_process.api.file_import_service import router as import_router
 from app.import_process.api.document_preview_service import router as document_router
 from app.import_process.api.document_event_service import router as document_event_router
@@ -31,34 +28,33 @@ FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 async def lifespan(app: FastAPI):
     logger.info("===== Advanced RAG 服务启动 =====")
 
-    # 校验百炼 API Key
-    api_key = lm_config.DASHSCOPE_API_KEY
-    if not api_key or api_key.startswith("sk-xxxx"):
-        logger.warning("⚠️  DASHSCOPE_API_KEY 未配置或为占位符！")
-        logger.warning("⚠️  请在项目根目录 .env 文件中填入真实的阿里云百炼 API Key")
-        logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 模型广场 → API Key")
-    else:
-        logger.info(f"百炼 API Key 已配置: {api_key[:8]}...{api_key[-4:]}")
+    # 输出配置摘要（敏感项已脱敏），并校验关键配置
+    logger.info(f"运行配置: {settings.describe()}")
 
-    # 校验 MinerU API Token（PDF 导入需要）
-    mineru_token = mineru_config.API_TOKEN
-    if not mineru_token or mineru_token.startswith("your_"):
+    if settings.dashscope_key_configured:
+        logger.info("百炼 API Key 已配置")
+    else:
+        logger.warning("⚠️  DASHSCOPE_API_KEY 未配置或为占位符！")
+        logger.warning("⚠️  请在 backend/.env 文件中填入真实的阿里云百炼 API Key")
+        logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 模型广场 → API Key")
+
+    if settings.mineru_token_configured:
+        logger.info("MinerU API Token 已配置")
+    else:
         logger.warning("⚠️  MINERU_API_TOKEN 未配置或为占位符！PDF 导入功能将不可用")
         logger.warning("⚠️  获取地址: https://mineru.net/ → 个人中心 → API Token")
-    else:
-        logger.info(f"MinerU API Token 已配置: {mineru_token[:8]}...")
 
-    # 校验百炼 MCP App ID（网络搜索需要）
-    mcp_app_id = bailian_mcp_config.BAILIAN_MCP_APP_ID
-    if not mcp_app_id or mcp_app_id.startswith("your_"):
+    if settings.bailian_mcp_configured:
+        logger.info("百炼 MCP App ID 已配置")
+    else:
         logger.warning("⚠️  BAILIAN_MCP_APP_ID 未配置或为占位符！网络搜索功能将不可用")
         logger.warning("⚠️  获取地址: https://bailian.console.aliyun.com/ → 应用广场 → 创建应用")
-    else:
-        logger.info(f"百炼 MCP App ID 已配置: {mcp_app_id}")
 
-    # 校验 Kafka 配置
-    if kafka_config.ENABLED:
-        logger.info(f"Kafka 已启用: brokers={kafka_config.BOOTSTRAP_SERVERS}, topic={kafka_config.TOPIC}")
+    if settings.kafka_enabled:
+        logger.info(
+            f"Kafka 已启用: brokers={settings.kafka_bootstrap_servers}, "
+            f"topic={settings.kafka_topic}"
+        )
         # 启动 Kafka 消费者
         await start_kafka_consumer()
     else:

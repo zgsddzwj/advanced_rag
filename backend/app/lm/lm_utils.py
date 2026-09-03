@@ -5,7 +5,7 @@ LLM 客户端封装（Qwen-Plus via 百炼 OpenAI 兼容接口）
 from typing import Optional
 from langchain_openai import ChatOpenAI
 from app.core.logger import logger
-from app.conf.lm_config import lm_config
+from app.conf.settings import settings
 
 _llm_client: Optional[ChatOpenAI] = None
 
@@ -15,11 +15,11 @@ def get_llm_client() -> ChatOpenAI:
     global _llm_client
     if _llm_client is None:
         _llm_client = ChatOpenAI(
-            model=lm_config.LLM_MODEL,
-            api_key=lm_config.DASHSCOPE_API_KEY,
-            base_url=lm_config.LLM_BASE_URL,
+            model=settings.llm_model_name,
+            api_key=settings.dashscope_api_key,
+            base_url=settings.llm_base_url,
             temperature=0.3,
             streaming=True,
         )
-        logger.info(f"LLM 客户端初始化成功: {lm_config.LLM_MODEL}")
+        logger.info(f"LLM 客户端初始化成功: {settings.llm_model_name}")
     return _llm_client

@@ -2,16 +2,13 @@
 MongoDB 对话历史工具
 负责多轮对话的存取管理
 """
-import os
 from typing import List, Dict, Any
 from datetime import datetime
 from pymongo import MongoClient, DESCENDING, ASCENDING
 from bson import ObjectId
-from dotenv import load_dotenv
 
 from app.core.logger import logger
-
-load_dotenv()
+from app.conf.settings import settings
 
 
 class HistoryMongoTool:
@@ -19,8 +16,8 @@ class HistoryMongoTool:
 
     def __init__(self):
         try:
-            self.mongo_url = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-            self.db_name = os.getenv("MONGO_DB_NAME", "kb002")
+            self.mongo_url = settings.mongo_url
+            self.db_name = settings.mongo_db_name
 
             self.client = MongoClient(self.mongo_url)
             self.db = self.client[self.db_name]

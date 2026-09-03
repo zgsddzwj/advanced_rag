@@ -19,10 +19,10 @@ from app.lm.lm_utils import get_llm_client
 from app.lm.embedding_utils import generate_embedding
 from app.clients.milvus_utils import get_milvus_client, ensure_collection_loaded
 from app.clients.mongo_history_utils import get_recent_messages, save_chat_message
-from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start, push_thinking_done
+from app.conf.settings import settings
 
 # 主题对齐相似度阈值
 ITEM_NAME_MATCH_THRESHOLD = 0.65
@@ -148,7 +148,7 @@ def _align_item_names(item_names: List[str]) -> List[str]:
     if not item_names:
         return []
 
-    collection_name = milvus_config.ITEM_NAMES_COLLECTION
+    collection_name = settings.item_names_collection
 
     try:
         client = get_milvus_client()

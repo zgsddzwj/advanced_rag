@@ -6,8 +6,8 @@ from typing import Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 from app.core.logger import logger
-from app.conf.lm_config import lm_config
 from app.utils.retry_utils import with_retry
+from app.conf.settings import settings
 
 _vlm_client: Optional[ChatOpenAI] = None
 
@@ -17,12 +17,12 @@ def get_vlm_client() -> ChatOpenAI:
     global _vlm_client
     if _vlm_client is None:
         _vlm_client = ChatOpenAI(
-            model=lm_config.VLM_MODEL,
-            api_key=lm_config.DASHSCOPE_API_KEY,
-            base_url=lm_config.VLM_BASE_URL,
+            model=settings.vlm_model_name,
+            api_key=settings.dashscope_api_key,
+            base_url=settings.vlm_base_url,
             temperature=0.1,
         )
-        logger.info(f"VLM 客户端初始化成功: {lm_config.VLM_MODEL}")
+        logger.info(f"VLM 客户端初始化成功: {settings.vlm_model_name}")
     return _vlm_client
 
 

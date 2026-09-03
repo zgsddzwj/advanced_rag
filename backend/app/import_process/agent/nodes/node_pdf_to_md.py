@@ -13,11 +13,11 @@ from pathlib import Path
 
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
-from app.conf.mineru_config import mineru_config
 from app.core.logger import logger
+from app.conf.settings import settings
 
-MINERU_BASE_URL = mineru_config.BASE_URL
-MINERU_API_TOKEN = mineru_config.API_TOKEN
+MINERU_BASE_URL = settings.mineru_base_url
+MINERU_API_TOKEN = settings.mineru_api_token
 
 
 def node_pdf_to_md(state: ImportGraphState) -> ImportGraphState:

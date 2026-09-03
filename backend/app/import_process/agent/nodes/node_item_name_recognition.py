@@ -13,9 +13,8 @@ from app.lm.lm_utils import get_llm_client
 from app.lm.embedding_utils import generate_embedding
 from app.clients.milvus_utils import get_milvus_client, create_item_names_collection
 from app.utils.escape_milvus_string_utils import escape_milvus_string
-from app.conf.lm_config import lm_config
-from app.conf.milvus_config import milvus_config
 from app.core.logger import logger
+from app.conf.settings import settings
 
 DEFAULT_ITEM_NAME_CHUNK_K = 5
 SINGLE_CHUNK_CONTENT_MAX_LEN = 800
@@ -137,14 +136,14 @@ def _step_4_update_chunks(state: ImportGraphState, chunks: List[Dict], item_name
 
 def _step_5_save_to_milvus(state: ImportGraphState, file_title: str, item_name: str):
     """将文档主题及稠密向量保存到Milvus"""
-    collection_name = milvus_config.ITEM_NAMES_COLLECTION
+    collection_name = settings.item_names_collection
 
     try:
         client = get_milvus_client()
 
         # 集合不存在则创建
         if not client.has_collection(collection_name=collection_name):
-            create_item_names_collection(client, collection_name, lm_config.EMBEDDING_DIM)
+            create_item_names_collection(client, collection_name, settings.embedding_dimension)
 
         # 生成稠密向量
         dense_vector = generate_embedding(item_name) if item_name else None

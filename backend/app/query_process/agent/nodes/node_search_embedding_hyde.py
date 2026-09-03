@@ -21,10 +21,10 @@ from app.clients.milvus_utils import (
     hybrid_search,
     ensure_collection_loaded,
 )
-from app.conf.milvus_config import milvus_config
 from app.query_process.agent.search_utils import build_filter_expr, normalize_results
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
+from app.conf.settings import settings
 
 # HyDE 检索参数
 HYDE_SEARCH_LIMIT = 15
@@ -56,7 +56,7 @@ def node_search_embedding_hyde(state: QueryGraphState) -> QueryGraphState:
         state["hyde_text"] = hyde_text
         logger.info(f"HyDE 假设性回答生成完成，长度: {len(hyde_text)}")
 
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
         client = get_milvus_client()
 
         # 集合不存在则跳过

@@ -9,9 +9,8 @@ from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
 from app.clients.milvus_utils import get_milvus_client, create_chunks_collection, ensure_collection_loaded
 from app.utils.escape_milvus_string_utils import escape_milvus_string
-from app.conf.milvus_config import milvus_config
-from app.conf.lm_config import lm_config
 from app.core.logger import logger
+from app.conf.settings import settings
 
 # 批量插入大小
 INSERT_BATCH_SIZE = 50
@@ -29,12 +28,12 @@ def node_import_milvus(state: ImportGraphState) -> ImportGraphState:
             logger.warning("无有效切片数据，跳过入库")
             return state
 
-        collection_name = milvus_config.CHUNKS_COLLECTION
+        collection_name = settings.chunks_collection
         client = get_milvus_client()
 
         # 集合不存在则创建（含BM25 Function）
         if not client.has_collection(collection_name=collection_name):
-            create_chunks_collection(client, collection_name, lm_config.EMBEDDING_DIM)
+            create_chunks_collection(client, collection_name, settings.embedding_dimension)
 
         # 幂等性处理：删除同一file_title的旧数据
         file_title = state.get("file_title", "")

@@ -1,24 +1,14 @@
 """
 项目日志工具类
-基于 loguru 实现，支持 .env 配置控制台/文件双输出
+基于 loguru 实现，支持配置控制台/文件双输出（配置来自统一配置中心 settings）
 """
 import sys
 import inspect
 from pathlib import Path
-import os
-from dotenv import load_dotenv
+
 from loguru import logger
 
-# 加载 .env 配置
-load_dotenv()
-
-# 读取配置（带默认值）
-LOG_CONSOLE_ENABLE = os.getenv("LOG_CONSOLE_ENABLE", "True").lower() == "true"
-LOG_CONSOLE_LEVEL = os.getenv("LOG_CONSOLE_LEVEL", "INFO").upper()
-LOG_FILE_ENABLE = os.getenv("LOG_FILE_ENABLE", "True").lower() == "true"
-LOG_FILE_LEVEL = os.getenv("LOG_FILE_LEVEL", "INFO").upper()
-LOG_FILE_RETENTION = os.getenv("LOG_FILE_RETENTION", "7 days")
-LOG_FILE_ENCODING = os.getenv("LOG_FILE_ENCODING", "utf-8")
+from app.conf.settings import settings
 
 # 定义日志路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -39,24 +29,24 @@ def init_logger():
     """初始化全局日志配置"""
     logger.remove()
 
-    if LOG_CONSOLE_ENABLE:
+    if settings.log_console_enable:
         logger.add(
             sink=sys.stdout,
-            level=LOG_CONSOLE_LEVEL,
+            level=settings.log_console_level,
             format=LOG_FORMAT,
             colorize=True,
             enqueue=True
         )
 
-    if LOG_FILE_ENABLE:
+    if settings.log_file_enable:
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         logger.add(
             sink=LOG_FILE_PATH,
-            level=LOG_FILE_LEVEL,
+            level=settings.log_file_level,
             format=LOG_FORMAT,
             rotation="00:00",
-            retention=LOG_FILE_RETENTION,
-            encoding=LOG_FILE_ENCODING,
+            retention=settings.log_file_retention,
+            encoding=settings.log_file_encoding,
             enqueue=True,
             backtrace=True,
             diagnose=True

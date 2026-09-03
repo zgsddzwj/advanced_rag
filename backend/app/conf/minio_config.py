@@ -1,19 +1,19 @@
-"""MinIO 配置"""
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+"""
+[兼容层] MinIO 配置
+演进1 后所有配置统一由 app.conf.settings 提供，本模块仅为历史引用保留。
+新代码请使用：from app.conf.settings import settings
+"""
+from app.conf.settings import settings
 
 
 class MinioConfig:
-    """MinIO 客户端配置"""
-    ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-    SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-    BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME", "kb-import-bucket")
-    SECURE = os.getenv("MINIO_SECURE", "False").lower() == "true"
-    PDF_DIR = os.getenv("MINIO_PDF_DIR", "pdf_files")
-    IMG_DIR = os.getenv("MINIO_IMG_DIR", "images")
+    ENDPOINT = settings.minio_endpoint
+    ACCESS_KEY = settings.minio_access_key
+    SECRET_KEY = settings.minio_secret_key
+    BUCKET_NAME = settings.minio_bucket_name
+    SECURE = settings.minio_secure
+    PDF_DIR = settings.minio_pdf_dir
+    IMG_DIR = settings.minio_img_dir
 
 
 minio_config = MinioConfig()

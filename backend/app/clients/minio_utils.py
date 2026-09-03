@@ -6,7 +6,7 @@ import io
 from typing import Optional
 from minio import Minio
 from app.core.logger import logger
-from app.conf.minio_config import minio_config
+from app.conf.settings import settings
 
 _minio_client: Optional[Minio] = None
 
@@ -16,18 +16,18 @@ def get_minio_client() -> Minio:
     global _minio_client
     if _minio_client is None:
         _minio_client = Minio(
-            minio_config.ENDPOINT,
-            access_key=minio_config.ACCESS_KEY,
-            secret_key=minio_config.SECRET_KEY,
-            secure=minio_config.SECURE,
+            settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            secure=settings.minio_secure,
         )
 
         # 自动创建 bucket
-        if not _minio_client.bucket_exists(minio_config.BUCKET_NAME):
-            _minio_client.make_bucket(minio_config.BUCKET_NAME)
-            logger.info(f"MinIO bucket 创建成功: {minio_config.BUCKET_NAME}")
+        if not _minio_client.bucket_exists(settings.minio_bucket_name):
+            _minio_client.make_bucket(settings.minio_bucket_name)
+            logger.info(f"MinIO bucket 创建成功: {settings.minio_bucket_name}")
 
-        logger.info(f"MinIO 客户端连接成功: {minio_config.ENDPOINT}")
+        logger.info(f"MinIO 客户端连接成功: {settings.minio_endpoint}")
     return _minio_client
 
 
@@ -42,7 +42,7 @@ def upload_file(local_path: str, object_name: str, content_type: str = "applicat
     client = get_minio_client()
 
     client.fput_object(
-        bucket_name=minio_config.BUCKET_NAME,
+        bucket_name=settings.minio_bucket_name,
         object_name=object_name,
         file_path=local_path,
         content_type=content_type
@@ -65,7 +65,7 @@ def upload_bytes(data: bytes, object_name: str, content_type: str = "application
     client = get_minio_client()
 
     client.put_object(
-        bucket_name=minio_config.BUCKET_NAME,
+        bucket_name=settings.minio_bucket_name,
         object_name=object_name,
         data=io.BytesIO(data),
         length=len(data),
@@ -79,5 +79,5 @@ def upload_bytes(data: bytes, object_name: str, content_type: str = "application
 
 def _build_object_url(object_name: str) -> str:
     """构造 MinIO 对象访问 URL"""
-    protocol = "https" if minio_config.SECURE else "http"
-    return f"{protocol}://{minio_config.ENDPOINT}/{minio_config.BUCKET_NAME}/{object_name}"
+    protocol = "https" if settings.minio_secure else "http"
+    return f"{protocol}://{settings.minio_endpoint}/{settings.minio_bucket_name}/{object_name}"
