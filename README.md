@@ -330,10 +330,19 @@ cd frontend && npm run dev
 3. Kafka 消费者后台常驻监听，收到事件后异步处理
 4. 更新 Milvus chunks + MongoDB 元数据
 
+### 事件驱动可靠性（演进6）
+
+- **处理器注册表**：事件类型 → 处理器由 `app/events/` 声明式注册，消费主循环零业务分支
+- **幂等消费**：`processed_events` 集合记录已消费 event_id（TTL 7 天自动过期），重复投递自动跳过
+- **重试**：单事件按配置指数重试（默认 3 次，间隔 5s 起）
+- **死信队列**：重试耗尽的事件转入 `document-events-dlq` topic（附失败上下文可重放），
+  同时元数据标记 `status=failed` + `last_error`
+- **可观测**：`kafka_events_total{type,outcome}` 与处理耗时指标接入 /metrics
+
 ### 降级机制
 
 - Kafka 不可用时，导入流程正常完成，仅跳过事件发布（降级为日志告警）
-- 消费者处理失败自动重试 3 次，失败后记录死信日志
+- 消费者处理失败自动重试，失败后转入死信队列（不阻塞消费循环）
 - 设置 `KAFKA_ENABLED=false` 可完全关闭 Kafka 功能
 
 ## 测试

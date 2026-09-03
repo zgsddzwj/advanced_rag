@@ -17,7 +17,7 @@ class FakeCollection:
         self.indexes = []
         self.upsert_calls = 0
 
-    def create_index(self, spec):
+    def create_index(self, spec, **kwargs):
         self.indexes.append(spec)
         return "idx"
 

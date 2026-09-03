@@ -1,33 +1,32 @@
 """
-Kafka 消费者
-后台常驻消费 document-events topic，根据事件类型实时增量更新 Milvus chunks。
+Kafka 消费者（演进6 事件驱动强化）
+后台常驻消费 document-events topic，事件驱动增量更新 Milvus chunks。
 
-事件处理逻辑：
-  DOCUMENT_ADD:    触发完整 LangGraph 导入流程 → 入库 Milvus
-  DOCUMENT_UPDATE: 先删 Milvus 旧 chunks → 再触发导入流程
-  DOCUMENT_DELETE: 删除 Milvus 中该 file_title 的所有 chunks + item_names + 元数据
+架构升级：
+- 处理器注册表：事件 → 处理器的映射由 app/events/registry 声明式维护，
+  消费主循环不含任何业务分支（开闭原则）
+- 幂等消费：processed_events 集合记录已消费 event_id（TTL 自动过期），
+  at-least-once 投递下重复消息自动跳过
+- 可靠性：单事件指数重试；重试耗尽转入死信 topic（kafka_dlq_topic），
+  并在元数据中标记 failed + last_error，杜绝坏消息卡死消费循环
+- 可观测：kafka_events_total{type,outcome} 与处理耗时指标（app/core/metrics）
 """
 import asyncio
 import json
-import os
-import uuid
-import threading
+import time
 from typing import Optional
 
 from app.core.logger import logger
+from app.core import metrics
 from app.conf.settings import settings
-from app.repository.milvus_repository import get_milvus_repository
+from app.events.model import EventParseError, parse_event, get_handler
+from app.events import handlers  # noqa: F401 — 导入即完成处理器注册
+from app.repository.event_dedup_repository import get_event_dedup_repository
 from app.repository.document_meta_repository import get_document_meta_repository
-from app.utils.path_util import PROJECT_ROOT
 
 # 消费者全局状态
 _consumer_task: Optional[asyncio.Task] = None
-_consumer_thread: Optional[threading.Thread] = None
 _should_stop = False
-
-# 错误重试配置
-MAX_RETRY = 3
-RETRY_DELAY_SECONDS = 5
 
 
 async def start_kafka_consumer():
@@ -85,7 +84,10 @@ async def _consume_loop():
                 heartbeat_interval_ms=10000,
             )
             await consumer.start()
-            logger.info(f"Kafka 消费者连接成功: {settings.kafka_bootstrap_servers}, topic={settings.kafka_topic}")
+            logger.info(
+                f"Kafka 消费者连接成功: {settings.kafka_bootstrap_servers}, "
+                f"topic={settings.kafka_topic}, dlq={settings.kafka_dlq_topic}"
+            )
             break
         except Exception as e:
             if attempt == 0:
@@ -99,14 +101,9 @@ async def _consume_loop():
         async for msg in consumer:
             if _should_stop:
                 break
-
-            try:
-                await _process_event(msg.value)
-                await consumer.commit()
-            except Exception as e:
-                logger.error(f"事件处理失败，跳过: {e}", exc_info=True)
-                # 提交 offset 避免卡住，错误已记录
-                await consumer.commit()
+            # 无论成败都提交 offset：失败事件已重试并转入死信，不会因坏消息卡死
+            await _process_message(msg.value)
+            await consumer.commit()
 
     except asyncio.CancelledError:
         logger.info("Kafka 消费者收到取消信号")
@@ -120,153 +117,93 @@ async def _consume_loop():
         logger.info("Kafka 消费者循环已退出")
 
 
-async def _process_event(event: dict):
-    """处理单个 Kafka 事件（在线程池中执行同步逻辑）"""
-    event_type = event.get("event_type", "")
-    file_title = event.get("file_title", "")
-    file_path = event.get("file_path", "")
-    event_id = event.get("event_id", "")[:8]
+async def _process_message(raw: dict):
+    """
+    处理单条消息：解析 → 幂等检查 → 线程池执行（含重试）→ 死信兜底
+    任何失败路径都在本函数内闭环，保证调用方可安全提交 offset
+    """
+    # 1. 解析校验：坏消息直接死信，不重试
+    try:
+        event = parse_event(raw)
+    except EventParseError as e:
+        logger.error(f"丢弃非法事件: {e}")
+        metrics.inc_counter("kafka_events_total", {"type": "invalid", "outcome": "dead_letter"})
+        await _dead_letter_raw(raw, str(e))
+        return
 
-    logger.info(f"收到 Kafka 事件: {event_type} | {file_title} | event_id={event_id}")
+    labels = {"type": event.event_type, "outcome": "success"}
 
-    # 在线程池中执行同步的 Milvus / LangGraph 操作
-    loop = asyncio.get_event_loop()
-    await loop.run_in_executor(
-        None,
-        _handle_event_sync,
-        event_type,
-        file_title,
-        file_path,
-    )
+    # 2. 幂等检查：已成功消费的 event_id 直接跳过
+    dedup = get_event_dedup_repository()
+    if dedup.is_processed(event.event_id):
+        logger.info(f"重复事件已跳过（幂等）: {event.event_type} {event.file_title} event={event.short_id()}")
+        metrics.inc_counter("kafka_events_total", {"type": event.event_type, "outcome": "duplicate_skipped"})
+        return
+
+    # 3. 线程池执行（含指数重试）
+    start = time.perf_counter()
+    try:
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, _execute_with_retry, event)
+        metrics.observe_duration(
+            "kafka_event_duration_seconds", time.perf_counter() - start, {"type": event.event_type}
+        )
+    except Exception as e:
+        # 4. 重试耗尽 → 死信 + 元数据标记失败
+        metrics.inc_counter("kafka_events_total", {"type": event.event_type, "outcome": "dead_letter"})
+        await _dead_letter_raw(event.model_dump(), str(e), attempts=settings.kafka_event_retry_max)
+        get_document_meta_repository().mark_failed(event.file_title, str(e))
+        return
+
+    # 5. 记录消费成功（幂等标记）
+    dedup.mark_processed(event.event_id)
+    metrics.inc_counter("kafka_events_total", labels)
+    logger.info(f"事件处理成功: {event.event_type} | {event.file_title} | event={event.short_id()}")
 
 
-def _handle_event_sync(event_type: str, file_title: str, file_path: str):
-    """同步处理事件（在线程池中执行）"""
-    for attempt in range(1, MAX_RETRY + 1):
+def _execute_with_retry(event):
+    """在线程池中同步执行处理器，按配置指数重试；最终失败抛出异常"""
+    handler = get_handler(event.event_type)
+    if handler is None:
+        # 未注册的事件类型：跳过（记日志），视为已处理
+        logger.warning(f"未知事件类型: {event.event_type}, 跳过 (event={event.short_id()})")
+        return
+
+    max_retry = settings.kafka_event_retry_max
+    base_delay = settings.kafka_event_retry_delay_seconds
+
+    for attempt in range(max_retry + 1):
         try:
-            if event_type == "DOCUMENT_ADD":
-                _handle_add(file_title, file_path)
-            elif event_type == "DOCUMENT_UPDATE":
-                _handle_update(file_title, file_path)
-            elif event_type == "DOCUMENT_DELETE":
-                _handle_delete(file_title)
-            else:
-                logger.warning(f"未知事件类型: {event_type}, 跳过")
-            return  # 成功则退出
+            handler(event)
+            return
         except Exception as e:
-            logger.error(
-                f"事件处理失败 (attempt {attempt}/{MAX_RETRY}): "
-                f"{event_type} {file_title}, {e}",
-                exc_info=True,
+            if attempt == max_retry:
+                logger.error(
+                    f"事件处理彻底失败 (attempts={attempt + 1}): "
+                    f"{event.event_type} {event.file_title}, {e}",
+                    exc_info=True,
+                )
+                raise
+            delay = min(base_delay * (2 ** attempt), 60.0)
+            logger.warning(
+                f"事件处理失败 (attempt {attempt + 1}/{max_retry + 1}): "
+                f"{event.event_type} {event.file_title}, {delay:.1f}s 后重试, {e}"
             )
-            if attempt < MAX_RETRY:
-                import time
-                time.sleep(RETRY_DELAY_SECONDS)
-
-    logger.error(f"事件处理彻底失败，放弃: {event_type} {file_title}")
+            time.sleep(delay)
 
 
-# ============================================================
-#  事件处理逻辑
-# ============================================================
-
-def _handle_add(file_title: str, file_path: str):
-    """处理文档新增事件：触发完整导入流程"""
-    logger.info(f"[ADD] 开始导入: {file_title}")
-    get_document_meta_repository().mark_status(file_title, "syncing")
-
-    _run_import_graph(file_title, file_path)
-
-    # 更新状态为 active
-    get_document_meta_repository().mark_status(file_title, "active")
-    logger.info(f"[ADD] 导入完成: {file_title}")
-
-
-def _handle_update(file_title: str, file_path: str):
-    """处理文档变更事件：先删旧 chunks，再重新导入"""
-    logger.info(f"[UPDATE] 开始更新: {file_title}")
-    get_document_meta_repository().mark_status(file_title, "syncing")
-
-    # Step 1: 删除 Milvus 中的旧 chunks
-    get_milvus_repository().delete_by_file_title(file_title)
-    logger.info(f"[UPDATE] 旧 chunks 已删除: {file_title}")
-
-    # Step 2: 重新导入
-    _run_import_graph(file_title, file_path)
-
-    get_document_meta_repository().mark_status(file_title, "active")
-    logger.info(f"[UPDATE] 更新完成: {file_title}")
-
-
-def _handle_delete(file_title: str):
-    """处理文档删除事件：清除 Milvus chunks + item_names + 元数据"""
-    logger.info(f"[DELETE] 开始删除: {file_title}")
-
-    # Step 1: 删除 Milvus chunks
-    get_milvus_repository().delete_by_file_title(file_title)
-
-    # Step 2: 删除 Milvus item_names
-    get_milvus_repository().delete_item_names_by_file_title(file_title)
-
-    # Step 3: 删除 MongoDB 元数据
-    get_document_meta_repository().delete(file_title)
-
-    logger.info(f"[DELETE] 删除完成: {file_title}")
-
-
-# ============================================================
-#  LangGraph 导入流程
-# ============================================================
-
-def _run_import_graph(file_title: str, file_path: str):
-    """
-    触发 LangGraph 导入流程
-    复用现有的 kb_import_app，在当前线程同步执行
-    """
-    # 延迟导入，避免循环依赖
-    from app.import_process.agent.main_graph import kb_import_app
-    from app.import_process.agent.state import create_default_state
-    from app.utils.task_utils import update_task_status, TASK_STATUS_PROCESSING, TASK_STATUS_COMPLETED, TASK_STATUS_FAILED
-
-    task_id = f"kafka_{uuid.uuid4().hex[:8]}"
-    output_dir = str(PROJECT_ROOT / "output" / f"{task_id}_{file_title}")
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    update_task_status(task_id, TASK_STATUS_PROCESSING)
+async def _dead_letter_raw(payload: dict, error: str, attempts: int = 0):
+    """将失败载荷投递到死信 topic"""
+    from app.clients.kafka_producer import publish_to_dlq
 
     try:
-        initial_state = create_default_state(
-            task_id=task_id,
-            local_file_path=file_path,
-            local_dir=output_dir,
+        event = parse_event(payload)
+    except EventParseError:
+        # 载荷无法还原为事件模型 → 构造最小占位事件保证可追溯
+        from app.events.model import DocumentEvent
+        event = DocumentEvent(
+            event_id=str(payload.get("event_id", "unknown")) or "unknown",
+            event_type=str(payload.get("event_type", "unknown")),
+            file_title=str(payload.get("file_title", "")),
         )
-
-        result = kb_import_app.invoke(initial_state)
-
-        # 获取导入结果
-        chunks = result.get("chunks", [])
-        item_name = result.get("item_name", "")
-        chunk_count = len(chunks)
-
-        # 更新元数据
-        from app.clients.document_meta_utils import compute_content_hash
-        content_hash = compute_content_hash(file_path)
-        get_document_meta_repository().upsert(
-            file_title=file_title,
-            content_hash=content_hash,
-            chunk_count=chunk_count,
-            item_name=item_name,
-            file_path=file_path,
-        )
-
-        update_task_status(task_id, TASK_STATUS_COMPLETED)
-        logger.info(
-            f"Kafka 触发导入完成: {file_title}, chunks={chunk_count}, "
-            f"item_name={item_name}, task_id={task_id}"
-        )
-
-    except Exception as e:
-        logger.error(f"Kafka 触发导入失败: {file_title}, {e}", exc_info=True)
-        update_task_status(task_id, TASK_STATUS_FAILED)
-        raise
+    await publish_to_dlq(event, error, attempts)

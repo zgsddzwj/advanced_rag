@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str = "localhost:29092"
     kafka_topic: str = "document-events"
     kafka_consumer_group: str = "nexusrag-doc-sync"
+    # 死信队列 topic：重试耗尽的事件转入 DLQ 人工排查（演进6）
+    kafka_dlq_topic: str = "document-events-dlq"
+    # 事件处理重试策略（演进6）
+    kafka_event_retry_max: int = Field(default=3, ge=0, description="单事件最大重试次数")
+    kafka_event_retry_delay_seconds: float = Field(default=5.0, ge=0, description="重试基础间隔（秒）")
+    # 消费幂等：event_id 去重记录保留天数（TTL 索引自动清理）
+    event_dedup_ttl_days: int = Field(default=7, ge=1)
 
     # ===================== MinerU（PDF 解析） =====================
     mineru_base_url: str = "https://mineru.net/api/v4"

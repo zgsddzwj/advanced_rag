@@ -86,6 +86,22 @@ class DocumentMetaRepository:
         except Exception as e:
             logger.error(f"更新文档状态失败: {e}")
 
+    def mark_failed(self, file_title: str, error: str):
+        """事件处理彻底失败后标记文档状态与错误信息（死信配套，演进6）"""
+        try:
+            self.collection.update_one(
+                {"file_title": file_title},
+                {
+                    "$set": {
+                        "status": "failed",
+                        "last_error": error[:2000],
+                        "updated_at": datetime.now(timezone.utc),
+                    }
+                },
+            )
+        except Exception as e:
+            logger.error(f"标记文档失败状态异常: {e}")
+
     def list_all(self) -> List[Dict[str, Any]]:
         """列出所有文档元数据"""
         try:

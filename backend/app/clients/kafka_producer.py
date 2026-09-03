@@ -1,15 +1,15 @@
 """
 Kafka 生产者
-发布文档变更事件到 Kafka topic，支持 ADD / UPDATE / DELETE 三种事件类型。
+发布文档变更事件到 Kafka topic，支持 ADD / UPDATE / DELETE 三种事件类型，
+以及重试耗尽事件的死信（DLQ）投递（演进6）。
 使用 aiokafka 异步发送，与 FastAPI 异步模型无缝集成。
 """
 import json
-import uuid
 from datetime import datetime, timezone
-from typing import Optional
 
 from app.core.logger import logger
 from app.conf.settings import settings
+from app.events.model import build_event
 
 # 延迟导入 aiokafka，避免未安装时启动崩溃
 _producer = None
@@ -80,35 +80,72 @@ async def publish_document_event(
         logger.debug(f"Kafka 未启用，跳过事件发布: {event_type} {file_title}")
         return False
 
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": event_type,
-        "file_title": file_title,
-        "file_path": file_path,
-        "content_hash": content_hash,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "metadata": {
-            "chunk_count": chunk_count,
-            "item_name": item_name,
-        },
-    }
+    event = build_event(
+        event_type=event_type,
+        file_title=file_title,
+        file_path=file_path,
+        content_hash=content_hash,
+        chunk_count=chunk_count,
+        item_name=item_name,
+    )
+    return await send_event(event, topic=settings.kafka_topic)
 
+
+async def send_event(event, topic: str) -> bool:
+    """发送 DocumentEvent 到指定 topic（主 topic / 死信共用）"""
     try:
         producer = await _get_producer()
         if producer is None:
-            logger.warning(f"Kafka 生产者不可用，事件未发布: {event_type} {file_title}")
+            logger.warning(f"Kafka 生产者不可用，事件未发布: {event.event_type} {event.file_title}")
             return False
 
         await producer.send_and_wait(
-            topic=settings.kafka_topic,
-            key=file_title,
-            value=event,
+            topic=topic,
+            key=event.file_title,
+            value=event.model_dump(),
         )
-        logger.info(f"Kafka 事件已发布: {event_type} | {file_title} | event_id={event['event_id'][:8]}")
+        logger.info(
+            f"Kafka 事件已发布: {event.event_type} | {event.file_title} | "
+            f"event_id={event.short_id()} topic={topic}"
+        )
         return True
 
     except Exception as e:
-        logger.error(f"Kafka 事件发布失败: {event_type} {file_title}, {e}")
+        logger.error(f"Kafka 事件发布失败: {event.event_type} {event.file_title}, {e}")
+        return False
+
+
+async def publish_to_dlq(event, error: str, attempts: int) -> bool:
+    """
+    重试耗尽的事件转入死信队列，附失败上下文供人工排查/重放
+    死信发布失败仅记录日志（主流程已结束，不阻塞消费循环）
+    """
+    from app.events.model import DocumentEvent  # noqa: F401 — 类型提示用
+
+    dlq_payload = event.model_dump()
+    dlq_payload["dlq"] = {
+        "error": error[:2000],
+        "attempts": attempts,
+        "failed_at": datetime.now(timezone.utc).isoformat(),
+        "source_topic": settings.kafka_topic,
+    }
+    try:
+        producer = await _get_producer()
+        if producer is None:
+            logger.error(f"DLQ 不可用，事件丢失风险: {event.short_id()} {event.file_title}")
+            return False
+        await producer.send_and_wait(
+            topic=settings.kafka_dlq_topic,
+            key=event.file_title,
+            value=dlq_payload,
+        )
+        logger.warning(
+            f"事件已转入死信队列: {event.event_type} | {event.file_title} | "
+            f"event_id={event.short_id()} | attempts={attempts} | error={error[:200]}"
+        )
+        return True
+    except Exception as e:
+        logger.error(f"死信发布失败: {event.short_id()}, {e}")
         return False
 
 
