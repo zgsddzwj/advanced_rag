@@ -109,6 +109,12 @@ class Settings(BaseSettings):
     log_file_retention: str = "7 days"
     log_file_encoding: str = "utf-8"
 
+    # ===================== 缓存（演进8：多级缓存） =====================
+    embedding_cache_ttl_seconds: int = Field(default=21600, ge=60, description="Embedding 缓存 TTL（6h）")
+    hyde_cache_ttl_seconds: int = Field(default=3600, ge=60, description="HyDE 假设回答缓存 TTL（1h）")
+    web_search_cache_ttl_seconds: int = Field(default=1800, ge=60, description="联网搜索缓存 TTL（30min）")
+    alignment_cache_ttl_seconds: int = Field(default=600, ge=60, description="主题对齐缓存 TTL（10min）")
+
     # ===================== 校验器 =====================
 
     @field_validator("log_console_level", "log_file_level", mode="before")

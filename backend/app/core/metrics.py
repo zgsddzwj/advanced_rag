@@ -55,22 +55,25 @@ def inc_counter(name: str, labels: Dict[str, str] = None, value: float = 1.0):
         _counters[key] = _counters.get(key, 0.0) + value
 
 
-def inc_gauge(name: str, value: float = 1.0):
+def inc_gauge(name: str, value: float = 1.0, labels: Dict[str, str] = None):
     """gauge 增加"""
+    key = _label_key(name, labels or {})
     with _lock:
-        _gauges[name] = _gauges.get(name, 0.0) + value
+        _gauges[key] = _gauges.get(key, 0.0) + value
 
 
-def dec_gauge(name: str, value: float = 1.0):
+def dec_gauge(name: str, value: float = 1.0, labels: Dict[str, str] = None):
     """gauge 减少"""
+    key = _label_key(name, labels or {})
     with _lock:
-        _gauges[name] = _gauges.get(name, 0.0) - value
+        _gauges[key] = _gauges.get(key, 0.0) - value
 
 
-def set_gauge(name: str, value: float):
+def set_gauge(name: str, value: float, labels: Dict[str, str] = None):
     """gauge 直接赋值"""
+    key = _label_key(name, labels or {})
     with _lock:
-        _gauges[name] = value
+        _gauges[key] = value
 
 
 def observe_duration(name: str, seconds: float, labels: Dict[str, str] = None):

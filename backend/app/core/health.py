@@ -90,7 +90,12 @@ def collect_health() -> Dict:
     if not all_ok:
         logger.warning(f"健康检查发现异常依赖: {[k for k, v in results.items() if not v['ok']]}")
 
+    # 缓存统计（演进8）：命中率/条目数等，便于容量与效果观察
+    from app.core import app_caches  # noqa: F401 — 导入即注册全部命名缓存
+    from app.core.cache import all_stats as cache_all_stats
+
     return {
         "status": "ok" if all_ok else "degraded",
         "checks": results,
+        "caches": cache_all_stats(),
     }

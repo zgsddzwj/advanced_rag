@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
 from app.lm.web_search_utils import web_search
+from app.core.app_caches import web_search_cache
 from app.query_process.agent.retrieval_config import get_retrieval_config
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
@@ -28,9 +29,14 @@ def node_web_search_mcp(state: QueryGraphState) -> QueryGraphState:
             state["web_search_docs"] = []
             return state
 
-        # 调用百炼 MCP 网络搜索（结果数按请求配置）
+        # 调用百炼 MCP 网络搜索（结果数按请求配置；命中缓存免外部调用，空结果不缓存）
         config = get_retrieval_config(state)
-        docs = web_search(query, count=config.web_search_count)
+        cache_key = f"{query}::{config.web_search_count}"
+        docs = web_search_cache.get(cache_key)
+        if docs is None:
+            docs = web_search(query, count=config.web_search_count)
+            if docs:
+                web_search_cache.set(cache_key, docs)
 
         # 规范化结果格式，与向量检索结果统一
         normalized_docs = _normalize_web_results(docs)

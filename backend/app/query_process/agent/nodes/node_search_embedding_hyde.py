@@ -15,6 +15,7 @@ from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
 from app.query_process.agent.retrievers import get_retriever
 from app.query_process.agent.retrieval_config import get_retrieval_config
+from app.core.app_caches import hyde_cache
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start
 
@@ -89,8 +90,8 @@ def _decide_web_search(config, total_unique: int) -> bool:
 
 
 def _generate_hyde_text(query: str) -> str:
-    """调用 LLM 生成假设性回答"""
-    try:
+    """获取假设性回答：优先命中缓存，未命中调用 LLM（失败回退原始查询，不缓存）"""
+    def _factory() -> str:
         prompt = load_prompt("hyde_generate", query=query)
         llm = get_llm_client()
         messages = [
@@ -99,13 +100,12 @@ def _generate_hyde_text(query: str) -> str:
         ]
         resp = llm.invoke(messages)
         text = getattr(resp, "content", "").strip()
-
-        # 限制长度
         if len(text) > HYDE_TEXT_MAX_LEN:
             text = text[:HYDE_TEXT_MAX_LEN]
-
         return text
 
+    try:
+        return hyde_cache.get_or_set(query, _factory)
     except Exception as e:
         logger.error(f"生成 HyDE 文本失败: {e}，使用原始查询替代")
         return query

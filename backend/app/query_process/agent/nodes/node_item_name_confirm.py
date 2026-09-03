@@ -18,6 +18,7 @@ from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
 from app.lm.embedding_utils import generate_embedding
 from app.repository.chat_history_repository import get_chat_history_repository
+from app.core.app_caches import alignment_cache
 from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start, push_thinking_done
@@ -160,7 +161,10 @@ def _align_item_names(item_names: List[str]) -> List[str]:
 
         # 并行处理多个 item_name 的向量对齐
         def _align_single(name: str) -> str:
-            """对单个 item_name 进行向量对齐"""
+            """对单个 item_name 进行向量对齐（结果带短 TTL 缓存）"""
+            cached = alignment_cache.get(name)
+            if cached is not None:
+                return cached
             try:
                 dense_vector = generate_embedding(name)
                 results = repository.search_top_item_name(dense_vector)
@@ -172,12 +176,14 @@ def _align_item_names(item_names: List[str]) -> List[str]:
 
                     if score >= ITEM_NAME_MATCH_THRESHOLD and matched_name:
                         logger.info(f"文档主题对齐: '{name}' → '{matched_name}' (score={score:.4f})")
-                        return matched_name
+                        aligned = matched_name
                     else:
                         logger.info(f"文档主题未对齐: '{name}' (最近匹配 score={score:.4f})")
-                        return name
+                        aligned = name
                 else:
-                    return name
+                    aligned = name
+                alignment_cache.set(name, aligned)
+                return aligned
             except Exception as e:
                 logger.warning(f"单个文档主题对齐失败: '{name}', {e}")
                 return name
