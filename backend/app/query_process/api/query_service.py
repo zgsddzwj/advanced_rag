@@ -19,7 +19,7 @@ from app.utils.task_utils import (
 )
 from app.query_process.agent.main_graph import kb_query_app
 from app.query_process.agent.state import create_default_state
-from app.clients.mongo_history_utils import get_recent_messages, clear_history
+from app.repository.chat_history_repository import get_chat_history_repository
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -81,7 +81,7 @@ async def stream(task_id: str, request: Request):
 @router.get("/history/{session_id}")
 async def get_history(session_id: str):
     """获取对话历史"""
-    messages = get_recent_messages(session_id, limit=20)
+    messages = get_chat_history_repository().get_recent(session_id, limit=20)
     result = []
     for msg in messages:
         result.append({
@@ -98,7 +98,7 @@ async def get_history(session_id: str):
 @router.delete("/history/{session_id}")
 async def delete_history(session_id: str):
     """清空对话历史"""
-    count = clear_history(session_id)
+    count = get_chat_history_repository().clear(session_id)
     return ok({"session_id": session_id, "deleted": count})
 
 

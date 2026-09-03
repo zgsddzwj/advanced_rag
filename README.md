@@ -118,11 +118,16 @@ advanced_rag/
 │   │   │   ├── embedding_utils.py       #     Embedding (text-embedding-v3)
 │   │   │   ├── rerank_utils.py          #     Rerank (gte-rerank)
 │   │   │   └── web_search_utils.py      #     网络搜索 (百炼 MCP)
+│   │   ├── repository/                  #   数据访问层 (演进3: Repository 模式)
+│   │   │   ├── mongo_connection.py      #     MongoDB 懒加载连接管理器
+│   │   │   ├── chat_history_repository.py  #  对话历史仓储
+│   │   │   ├── document_meta_repository.py #  文档元数据仓储
+│   │   │   └── milvus_repository.py     #     Milvus chunks/item_names 仓储
 │   │   ├── clients/                     #   基础设施客户端
-│   │   │   ├── milvus_utils.py          #     Milvus 连接 + 混合搜索
+│   │   │   ├── milvus_utils.py          #     Milvus 连接 + 集合创建 + 混合搜索
 │   │   │   ├── minio_utils.py           #     MinIO 文件操作
-│   │   │   ├── mongo_history_utils.py   #     MongoDB 对话历史
-│   │   │   ├── document_meta_utils.py   #     文档元数据管理 (content_hash)
+│   │   │   ├── mongo_history_utils.py   #     [兼容层] 对话历史 (委托 repository)
+│   │   │   ├── document_meta_utils.py   #     [兼容层] 文档元数据 (委托 repository)
 │   │   │   ├── kafka_producer.py        #     Kafka 生产者 (事件发布)
 │   │   │   └── kafka_consumer.py        #     Kafka 消费者 (增量同步)
 │   │   ├── utils/                       #   通用工具

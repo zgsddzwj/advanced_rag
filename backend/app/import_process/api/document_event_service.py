@@ -13,11 +13,10 @@ from app.core.exceptions import NotFoundError
 from app.core.response import ok
 from app.core.logger import logger
 from app.utils.path_util import PROJECT_ROOT
-from app.clients.document_meta_utils import get_metadata, compute_content_hash
+from app.clients.document_meta_utils import compute_content_hash
+from app.repository.document_meta_repository import get_document_meta_repository
+from app.repository.milvus_repository import get_milvus_repository
 from app.clients.kafka_producer import publish_document_event
-from app.clients.milvus_utils import get_milvus_client
-from app.utils.escape_milvus_string_utils import escape_milvus_string
-from app.conf.settings import settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -37,23 +36,16 @@ async def delete_document(file_title: str):
     Kafka 消费者将异步删除 Milvus 中的 chunks 和元数据
     """
     # 检查文档是否存在
-    meta = get_metadata(file_title)
+    meta_repo = get_document_meta_repository()
+    milvus_repo = get_milvus_repository()
+    meta = meta_repo.get(file_title)
     if not meta:
-        # 也检查 Milvus 中是否有数据
+        # 元数据缺失时回查 Milvus，避免误删仍有索引数据的文档
         try:
-            client = get_milvus_client()
-            collection_name = settings.chunks_collection
-            if client.has_collection(collection_name=collection_name):
-                client.load_collection(collection_name=collection_name)
-                safe_title = escape_milvus_string(file_title)
-                results = client.query(
-                    collection_name=collection_name,
-                    filter=f'file_title=="{safe_title}"',
-                    output_fields=["file_title"],
-                    limit=1,
-                )
-                if not results:
-                    raise NotFoundError(f"文档不存在: {file_title}")
+            if not milvus_repo.has_chunks(file_title):
+                raise NotFoundError(f"文档不存在: {file_title}")
+        except NotFoundError:
+            raise
         except Exception as e:
             logger.warning(f"检查 Milvus 文档存在性失败: {e}")
 
@@ -93,7 +85,7 @@ async def reimport_document(file_title: str, file: UploadFile = File(...)):
     content_hash = compute_content_hash(str(saved_path))
 
     # 检查是否有旧文档
-    meta = get_metadata(file_title)
+    meta = get_document_meta_repository().get(file_title)
     event_type = "DOCUMENT_UPDATE" if meta else "DOCUMENT_ADD"
 
     # 发布事件
@@ -117,6 +109,5 @@ async def reimport_document(file_title: str, file: UploadFile = File(...)):
 @router.get("/meta/list")
 async def list_document_meta():
     """列出所有文档的元数据（含同步状态）"""
-    from app.clients.document_meta_utils import list_all_metadata
-    docs = list_all_metadata()
+    docs = get_document_meta_repository().list_all()
     return ok({"documents": docs, "total": len(docs)})

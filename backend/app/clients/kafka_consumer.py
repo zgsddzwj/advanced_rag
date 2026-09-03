@@ -15,15 +15,10 @@ import threading
 from typing import Optional
 
 from app.core.logger import logger
-from app.clients.milvus_utils import get_milvus_client
-from app.clients.document_meta_utils import (
-    mark_status,
-    delete_metadata,
-    get_metadata,
-)
-from app.utils.escape_milvus_string_utils import escape_milvus_string
-from app.utils.path_util import PROJECT_ROOT
 from app.conf.settings import settings
+from app.repository.milvus_repository import get_milvus_repository
+from app.repository.document_meta_repository import get_document_meta_repository
+from app.utils.path_util import PROJECT_ROOT
 
 # 消费者全局状态
 _consumer_task: Optional[asyncio.Task] = None
@@ -178,28 +173,28 @@ def _handle_event_sync(event_type: str, file_title: str, file_path: str):
 def _handle_add(file_title: str, file_path: str):
     """处理文档新增事件：触发完整导入流程"""
     logger.info(f"[ADD] 开始导入: {file_title}")
-    mark_status(file_title, "syncing")
+    get_document_meta_repository().mark_status(file_title, "syncing")
 
     _run_import_graph(file_title, file_path)
 
     # 更新状态为 active
-    mark_status(file_title, "active")
+    get_document_meta_repository().mark_status(file_title, "active")
     logger.info(f"[ADD] 导入完成: {file_title}")
 
 
 def _handle_update(file_title: str, file_path: str):
     """处理文档变更事件：先删旧 chunks，再重新导入"""
     logger.info(f"[UPDATE] 开始更新: {file_title}")
-    mark_status(file_title, "syncing")
+    get_document_meta_repository().mark_status(file_title, "syncing")
 
     # Step 1: 删除 Milvus 中的旧 chunks
-    _delete_chunks_from_milvus(file_title)
+    get_milvus_repository().delete_by_file_title(file_title)
     logger.info(f"[UPDATE] 旧 chunks 已删除: {file_title}")
 
     # Step 2: 重新导入
     _run_import_graph(file_title, file_path)
 
-    mark_status(file_title, "active")
+    get_document_meta_repository().mark_status(file_title, "active")
     logger.info(f"[UPDATE] 更新完成: {file_title}")
 
 
@@ -208,65 +203,15 @@ def _handle_delete(file_title: str):
     logger.info(f"[DELETE] 开始删除: {file_title}")
 
     # Step 1: 删除 Milvus chunks
-    _delete_chunks_from_milvus(file_title)
+    get_milvus_repository().delete_by_file_title(file_title)
 
     # Step 2: 删除 Milvus item_names
-    _delete_item_names_from_milvus(file_title)
+    get_milvus_repository().delete_item_names_by_file_title(file_title)
 
     # Step 3: 删除 MongoDB 元数据
-    delete_metadata(file_title)
+    get_document_meta_repository().delete(file_title)
 
     logger.info(f"[DELETE] 删除完成: {file_title}")
-
-
-# ============================================================
-#  Milvus 操作
-# ============================================================
-
-def _delete_chunks_from_milvus(file_title: str):
-    """从 kb_chunks 集合中删除指定 file_title 的所有 chunks"""
-    try:
-        client = get_milvus_client()
-        collection_name = settings.chunks_collection
-
-        if not client.has_collection(collection_name=collection_name):
-            logger.warning(f"集合 {collection_name} 不存在，跳过删除")
-            return
-
-        client.load_collection(collection_name=collection_name)
-        safe_title = escape_milvus_string(file_title)
-        client.delete(
-            collection_name=collection_name,
-            filter=f'file_title=="{safe_title}"',
-        )
-        logger.info(f"已从 {collection_name} 删除 file_title={file_title} 的 chunks")
-
-    except Exception as e:
-        logger.error(f"从 Milvus 删除 chunks 失败: {file_title}, {e}")
-        raise
-
-
-def _delete_item_names_from_milvus(file_title: str):
-    """从 kb_item_names 集合中删除指定 file_title 的记录"""
-    try:
-        client = get_milvus_client()
-        collection_name = settings.item_names_collection
-
-        if not client.has_collection(collection_name=collection_name):
-            logger.warning(f"集合 {collection_name} 不存在，跳过删除")
-            return
-
-        client.load_collection(collection_name=collection_name)
-        safe_title = escape_milvus_string(file_title)
-        client.delete(
-            collection_name=collection_name,
-            filter=f'file_title=="{safe_title}"',
-        )
-        logger.info(f"已从 {collection_name} 删除 file_title={file_title} 的记录")
-
-    except Exception as e:
-        logger.error(f"从 Milvus 删除 item_names 失败: {file_title}, {e}")
-        raise
 
 
 # ============================================================
@@ -305,9 +250,9 @@ def _run_import_graph(file_title: str, file_path: str):
         chunk_count = len(chunks)
 
         # 更新元数据
-        from app.clients.document_meta_utils import upsert_metadata, compute_content_hash
+        from app.clients.document_meta_utils import compute_content_hash
         content_hash = compute_content_hash(file_path)
-        upsert_metadata(
+        get_document_meta_repository().upsert(
             file_title=file_title,
             content_hash=content_hash,
             chunk_count=chunk_count,

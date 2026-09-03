@@ -21,6 +21,7 @@ from app.import_process.api.document_event_service import router as document_eve
 from app.query_process.api.query_service import router as query_router
 from app.clients.kafka_consumer import start_kafka_consumer, stop_kafka_consumer
 from app.clients.kafka_producer import close_producer
+from app.repository.mongo_connection import close_mongo
 
 # 前端构建产物目录（frontend/dist/）
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
@@ -65,9 +66,10 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("===== Advanced RAG 服务关闭 =====")
 
-    # 停止 Kafka 消费者和生产者
+    # 停止 Kafka 消费者和生产者，关闭 MongoDB 连接
     await stop_kafka_consumer()
     await close_producer()
+    close_mongo()
 
 
 app = FastAPI(title="NexusRAG", lifespan=lifespan)

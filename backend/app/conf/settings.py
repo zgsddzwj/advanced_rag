@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     # ===================== MongoDB =====================
     mongo_url: str = "mongodb://localhost:27017"
     mongo_db_name: str = "kb002"
+    mongo_server_selection_timeout_ms: int = Field(default=5000, ge=1000,
+                                                   description="MongoDB serverSelection 超时（毫秒）")
 
     # ===================== Kafka =====================
     kafka_enabled: bool = True

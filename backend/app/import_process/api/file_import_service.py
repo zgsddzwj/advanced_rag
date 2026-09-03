@@ -22,7 +22,8 @@ from app.utils.task_utils import (
 )
 from app.import_process.agent.main_graph import kb_import_app
 from app.import_process.agent.state import create_default_state
-from app.clients.document_meta_utils import compute_content_hash, get_metadata, upsert_metadata
+from app.clients.document_meta_utils import compute_content_hash
+from app.repository.document_meta_repository import get_document_meta_repository
 from app.clients.kafka_producer import publish_document_event
 
 router = APIRouter(prefix="/import", tags=["import"])
@@ -141,7 +142,7 @@ def _run_import(task_id: str, file_path: str, output_dir: str):
 
         # 保存文档元数据到 MongoDB
         content_hash = compute_content_hash(file_path)
-        old_meta = upsert_metadata(
+        old_meta = get_document_meta_repository().upsert(
             file_title=file_title,
             content_hash=content_hash,
             chunk_count=chunk_count,

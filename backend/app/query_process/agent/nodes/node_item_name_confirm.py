@@ -17,8 +17,7 @@ from app.core.logger import logger
 from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
 from app.lm.embedding_utils import generate_embedding
-from app.clients.milvus_utils import get_milvus_client, ensure_collection_loaded
-from app.clients.mongo_history_utils import get_recent_messages, save_chat_message
+from app.repository.chat_history_repository import get_chat_history_repository
 from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.thinking_utils import push_thinking_start, push_thinking_done
@@ -78,7 +77,7 @@ def _load_history(state: QueryGraphState) -> List[Dict[str, Any]]:
         return []
 
     try:
-        messages = get_recent_messages(session_id, limit=HISTORY_MAX_MESSAGES)
+        messages = get_chat_history_repository().get_recent(session_id, limit=HISTORY_MAX_MESSAGES)
         logger.info(f"加载历史对话: {len(messages)} 条")
         return messages
     except Exception as e:
@@ -151,27 +150,20 @@ def _align_item_names(item_names: List[str]) -> List[str]:
     collection_name = settings.item_names_collection
 
     try:
-        client = get_milvus_client()
+        from app.repository.milvus_repository import get_milvus_repository
+        repository = get_milvus_repository()
 
         # 集合不存在则跳过对齐
-        if not client.has_collection(collection_name=collection_name):
+        if not repository.has_collection(collection_name):
             logger.warning(f"集合 {collection_name} 不存在，跳过文档主题对齐")
             return item_names
-
-        ensure_collection_loaded(client, collection_name)
 
         # 并行处理多个 item_name 的向量对齐
         def _align_single(name: str) -> str:
             """对单个 item_name 进行向量对齐"""
             try:
                 dense_vector = generate_embedding(name)
-                results = client.search(
-                    collection_name=collection_name,
-                    data=[dense_vector],
-                    anns_field="dense_vector",
-                    limit=1,
-                    output_fields=["item_name", "file_title"],
-                )
+                results = repository.search_top_item_name(dense_vector)
 
                 if results and len(results) > 0 and len(results[0]) > 0:
                     top_hit = results[0][0]
@@ -218,7 +210,7 @@ def _save_user_message(
         return
 
     try:
-        save_chat_message(
+        get_chat_history_repository().save_message(
             session_id=session_id,
             role="user",
             text=state.get("query", ""),

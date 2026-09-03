@@ -1,17 +1,16 @@
 """
 文档预览服务 FastAPI 路由
 提供已上传文档列表、切分详情预览 API
+数据访问委托 app.repository.MilvusRepository（演进3）
 """
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 from fastapi import APIRouter, Query
 
 from app.core.exceptions import UpstreamServiceError
 from app.core.response import ok
 from app.core.logger import logger
-from app.clients.milvus_utils import get_milvus_client
-from app.utils.escape_milvus_string_utils import escape_milvus_string
-from app.conf.settings import settings
+from app.repository.milvus_repository import get_milvus_repository
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -21,29 +20,13 @@ async def list_documents():
     """
     获取所有已导入的文档列表
     按 file_title 聚合，返回每个文档的切片数、文档主题等信息
-    优化：只查询聚合所需字段，减少数据传输量
     """
     try:
-        client = get_milvus_client()
-        collection_name = settings.chunks_collection
-
-        if not client.has_collection(collection_name=collection_name):
-            return ok({"documents": [], "total": 0})
-
-        client.load_collection(collection_name=collection_name)
-
-        # 只查询聚合所需字段，避免传输全量 content
-        all_data = client.query(
-            collection_name=collection_name,
-            filter="",
-            output_fields=["file_title", "item_name", "title"],
-            limit=16384,
-        )
-
+        all_data = get_milvus_repository().list_document_agg_rows()
         if not all_data:
             return ok({"documents": [], "total": 0})
 
-        # 按 file_title 聚合
+        # 按 file_title 聚合（业务逻辑保留在服务层）
         doc_map: Dict[str, Dict[str, Any]] = {}
         for row in all_data:
             ft = row.get("file_title", "未知文档")
@@ -71,31 +54,9 @@ async def list_documents():
 
 @router.get("/chunks/{file_title:path}")
 async def get_document_chunks(file_title: str, limit: int = Query(500, ge=1, le=1000)):
-    """
-    获取指定文档的切分详情
-    返回所有切片的标题、内容、文档主题等信息
-    """
+    """获取指定文档的切分详情，返回所有切片的标题、内容、文档主题等信息"""
     try:
-        client = get_milvus_client()
-        collection_name = settings.chunks_collection
-
-        if not client.has_collection(collection_name=collection_name):
-            return ok({"file_title": file_title, "chunks": [], "total": 0})
-
-        client.load_collection(collection_name=collection_name)
-
-        safe_title = escape_milvus_string(file_title)
-
-        chunks = client.query(
-            collection_name=collection_name,
-            filter=f'file_title=="{safe_title}"',
-            output_fields=["title", "parent_title", "part", "content", "item_name", "file_title"],
-            limit=limit,
-        )
-
-        # 按 part 排序
-        chunks.sort(key=lambda x: x.get("part", 0))
-
+        chunks = get_milvus_repository().get_chunks(file_title, limit=limit)
         return ok({
             "file_title": file_title,
             "chunks": chunks,

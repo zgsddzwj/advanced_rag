@@ -10,9 +10,6 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from app.import_process.agent.state import ImportGraphState
 from app.utils.task_utils import add_running_task, add_done_task
 from app.lm.lm_utils import get_llm_client
-from app.lm.embedding_utils import generate_embedding
-from app.clients.milvus_utils import get_milvus_client, create_item_names_collection
-from app.utils.escape_milvus_string_utils import escape_milvus_string
 from app.core.logger import logger
 from app.conf.settings import settings
 
@@ -135,35 +132,16 @@ def _step_4_update_chunks(state: ImportGraphState, chunks: List[Dict], item_name
 
 
 def _step_5_save_to_milvus(state: ImportGraphState, file_title: str, item_name: str):
-    """将文档主题及稠密向量保存到Milvus"""
-    collection_name = settings.item_names_collection
-
+    """将文档主题及稠密向量保存到Milvus（数据访问委托仓储）"""
     try:
-        client = get_milvus_client()
+        from app.repository.milvus_repository import get_milvus_repository
+        from app.lm.embedding_utils import generate_embedding
 
-        # 集合不存在则创建
-        if not client.has_collection(collection_name=collection_name):
-            create_item_names_collection(client, collection_name, settings.embedding_dimension)
+        repository = get_milvus_repository()
+        repository.ensure_item_names_collection(settings.embedding_dimension)
 
-        # 生成稠密向量
         dense_vector = generate_embedding(item_name) if item_name else None
-
-        # 幂等性处理：删除同名数据
-        if item_name:
-            client.load_collection(collection_name=collection_name)
-            safe_item_name = escape_milvus_string(item_name)
-            client.delete(collection_name=collection_name, filter=f'item_name=="{safe_item_name}"')
-
-        # 插入数据
-        data = {
-            "file_title": file_title,
-            "item_name": item_name,
-        }
-        if dense_vector is not None:
-            data["dense_vector"] = dense_vector
-
-        client.insert(collection_name=collection_name, data=[data])
-        client.load_collection(collection_name=collection_name)
+        repository.replace_item_name(file_title, item_name, dense_vector)
         logger.info(f"文档主题存入Milvus成功: {item_name}")
 
     except Exception as e:

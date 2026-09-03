@@ -1,63 +1,13 @@
 """
-MongoDB 对话历史工具
-负责多轮对话的存取管理
+[兼容层] MongoDB 对话历史工具
+演进3 后数据访问统一由 app.repository.chat_history_repository 提供，
+本模块仅为历史引用保留。新代码请使用：
+    from app.repository import get_chat_history_repository
+
+注：演进前本模块在导入期即建立 MongoDB 连接（基础设施未就绪时每个进程
+都要付出超时等待）；现连接已下沉至仓储层懒加载，导入本模块零开销。
 """
-from typing import List, Dict, Any
-from datetime import datetime
-from pymongo import MongoClient, DESCENDING, ASCENDING
-from bson import ObjectId
-
-from app.core.logger import logger
-from app.conf.settings import settings
-
-
-class HistoryMongoTool:
-    """MongoDB 历史对话记录读写工具类"""
-
-    def __init__(self):
-        try:
-            self.mongo_url = settings.mongo_url
-            self.db_name = settings.mongo_db_name
-
-            self.client = MongoClient(self.mongo_url)
-            self.db = self.client[self.db_name]
-            self.chat_message = self.db["chat_message"]
-
-            # 创建复合索引：session_id 升序 + ts 降序
-            self.chat_message.create_index([("session_id", 1), ("ts", -1)])
-
-            logger.info(f"MongoDB 连接成功: {self.db_name}")
-        except Exception as e:
-            logger.error(f"MongoDB 连接失败: {e}")
-            raise
-
-
-_history_mongo_tool = None
-
-try:
-    _history_mongo_tool = HistoryMongoTool()
-except Exception as e:
-    logger.warning(f"MongoDB 模块加载时初始化失败: {e}")
-
-
-def get_history_mongo_tool() -> HistoryMongoTool:
-    """获取单例实例（懒加载）"""
-    global _history_mongo_tool
-    if _history_mongo_tool is None:
-        _history_mongo_tool = HistoryMongoTool()
-    return _history_mongo_tool
-
-
-def clear_history(session_id: str) -> int:
-    """清空指定会话的所有历史对话"""
-    mongo_tool = get_history_mongo_tool()
-    try:
-        result = mongo_tool.chat_message.delete_many({"session_id": session_id})
-        logger.info(f"已删除 {result.deleted_count} 条消息 (session: {session_id})")
-        return result.deleted_count
-    except Exception as e:
-        logger.error(f"清空历史对话失败 (session: {session_id}): {e}")
-        return 0
+from app.repository.chat_history_repository import get_chat_history_repository
 
 
 def save_chat_message(
@@ -65,69 +15,32 @@ def save_chat_message(
     role: str,
     text: str,
     rewritten_query: str = "",
-    item_names: List[str] = None,
-    image_urls: List[str] = None,
-    message_id: str = None
+    item_names: list = None,
+    image_urls: list = None,
+    message_id: str = None,
 ) -> str:
-    """
-    写入/更新单条会话记录
-    :return: 记录唯一标识
-    """
-    ts = datetime.now().timestamp()
-
-    document = {
-        "session_id": session_id,
-        "role": role,
-        "text": text,
-        "rewritten_query": rewritten_query or "",
-        "item_names": item_names,
-        "image_urls": image_urls,
-        "ts": ts
-    }
-
-    mongo_tool = get_history_mongo_tool()
-    if message_id:
-        mongo_tool.chat_message.update_one(
-            {"_id": ObjectId(message_id)},
-            {"$set": document}
-        )
-        return message_id
-    else:
-        result = mongo_tool.chat_message.insert_one(document)
-        return str(result.inserted_id)
+    """写入/更新单条会话记录（委托仓储）"""
+    return get_chat_history_repository().save_message(
+        session_id=session_id,
+        role=role,
+        text=text,
+        rewritten_query=rewritten_query,
+        item_names=item_names,
+        image_urls=image_urls,
+        message_id=message_id,
+    )
 
 
-def get_recent_messages(session_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-    """
-    查询指定会话的最近 N 条对话记录
-    结果按时间正序排列（先按 ts 降序取最近 N 条，再反转为正序）
-    """
-    mongo_tool = get_history_mongo_tool()
-    try:
-        query = {"session_id": session_id}
-        # 先按 ts 降序取最近的 limit 条，再反转为时间正序
-        cursor = mongo_tool.chat_message.find(query).sort("ts", DESCENDING).limit(limit)
-        messages = list(cursor)
-        messages.reverse()
-        # 统一将 _id (ObjectId) 转为字符串，便于 JSON 序列化
-        for msg in messages:
-            if "_id" in msg:
-                msg["_id"] = str(msg["_id"])
-        return messages
-    except Exception as e:
-        logger.error(f"获取最近消息失败 (session: {session_id}): {e}")
-        return []
+def get_recent_messages(session_id: str, limit: int = 10) -> list:
+    """查询指定会话的最近 N 条对话记录（时间正序）"""
+    return get_chat_history_repository().get_recent(session_id, limit=limit)
+
+
+def clear_history(session_id: str) -> int:
+    """清空指定会话的所有历史对话"""
+    return get_chat_history_repository().clear(session_id)
 
 
 def get_message_count(session_id: str) -> int:
-    """
-    获取指定会话的消息总数
-    :param session_id: 会话 ID
-    :return: 消息数量
-    """
-    mongo_tool = get_history_mongo_tool()
-    try:
-        return mongo_tool.chat_message.count_documents({"session_id": session_id})
-    except Exception as e:
-        logger.error(f"获取消息数量失败 (session: {session_id}): {e}")
-        return 0
+    """获取指定会话的消息总数"""
+    return get_chat_history_repository().count(session_id)

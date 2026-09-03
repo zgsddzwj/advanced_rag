@@ -16,7 +16,7 @@ from app.query_process.agent.state import QueryGraphState
 from app.core.logger import logger
 from app.core.load_prompt import load_prompt
 from app.lm.lm_utils import get_llm_client
-from app.clients.mongo_history_utils import save_chat_message
+from app.repository.chat_history_repository import get_chat_history_repository
 from app.query_process.agent.search_utils import format_history
 from app.utils.task_utils import add_running_task, add_done_task
 from app.utils.sse_utils import push_to_session, SSEEvent
@@ -194,7 +194,7 @@ def _save_assistant_message(
         return
 
     try:
-        save_chat_message(
+        get_chat_history_repository().save_message(
             session_id=session_id,
             role="assistant",
             text=answer,
