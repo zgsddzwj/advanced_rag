@@ -35,8 +35,7 @@ async def reimport_document(
     重新导入文档：上传新版本文件，发布 DOCUMENT_UPDATE 事件
     Kafka 消费者将先删除旧 chunks，再重新导入
     """
-    content = await file.read()
-    result = await service.reimport_document(file_title, content, file.filename or "")
+    result = await service.reimport_document(file_title, file)
     return ok(result)
 
 

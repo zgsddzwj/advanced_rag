@@ -108,17 +108,23 @@ class DocumentService:
             "message": "删除请求已提交，Kafka 消费者将异步处理",
         }
 
-    async def reimport_document(self, file_title: str, content: bytes, filename: str) -> dict:
+    async def reimport_document(self, file_title: str, upload) -> dict:
         """
-        重新导入文档：保存新版本文件，发布 UPDATE/ADD 事件
+        重新导入文档：流式保存新版本文件，发布 UPDATE/ADD 事件
         Kafka 消费者将先删除旧 chunks，再重新导入
+        :param upload: 上传流（filename + async read）
         """
+        filename = upload.filename or ""
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         task_id = str(uuid.uuid4())[:8]
         saved_filename = f"{task_id}_{filename}"
         saved_path = UPLOAD_DIR / saved_filename
         with open(saved_path, "wb") as f:
-            f.write(content)
+            while True:
+                chunk = await upload.read(1024 * 1024)
+                if not chunk:
+                    break
+                f.write(chunk)
 
         content_hash = compute_content_hash(str(saved_path))
         meta = self.meta_repo.get(file_title)

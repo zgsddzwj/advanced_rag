@@ -21,8 +21,7 @@ async def upload_file(
     上传文件并触发导入流程
     返回 task_id 供前端轮询
     """
-    content = await file.read()
-    result = service.submit_upload(content, file.filename or "", background_tasks)
+    result = await service.submit_upload(file, background_tasks)
     return ok(result)
 
 

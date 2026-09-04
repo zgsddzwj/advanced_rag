@@ -2,6 +2,8 @@
 演进4 单元测试：服务层 + 依赖注入
 通过构造函数注入仓储替身，验证用例编排逻辑
 """
+import asyncio
+
 import pytest
 
 from app.core.exceptions import FileValidationError, NotFoundError
@@ -17,6 +19,23 @@ class _FakeBackground:
         self.tasks.append((fn, args, kwargs))
 
 
+class FakeUpload:
+    """上传流替身：与 UploadStream 协议结构兼容"""
+
+    def __init__(self, filename: str, chunks: list):
+        self.filename = filename
+        self._chunks = list(chunks)
+
+    async def read(self, size: int = -1) -> bytes:
+        if not self._chunks:
+            return b""
+        return self._chunks.pop(0)
+
+
+def _submit(service, upload, bg):
+    return asyncio.run(service.submit_upload(upload, bg))
+
+
 class TestImportServiceValidation:
     def setup_method(self):
         self.service = ImportService(meta_repo=object())  # 校验阶段不触达仓储
@@ -24,30 +43,38 @@ class TestImportServiceValidation:
 
     def test_empty_filename_rejected(self):
         with pytest.raises(FileValidationError):
-            self.service.submit_upload(b"data", "", self.bg)
+            _submit(self.service, FakeUpload("", [b"data"]), self.bg)
 
     def test_unsupported_extension(self):
         with pytest.raises(FileValidationError) as exc:
-            self.service.submit_upload(b"data", "doc.docx", self.bg)
+            _submit(self.service, FakeUpload("doc.docx", [b"data"]), self.bg)
         assert "docx" in exc.value.message
 
-    def test_file_too_large(self):
-        with pytest.raises(FileValidationError) as exc:
-            self.service.submit_upload(b"x" * (101 * 1024 * 1024), "big.pdf", self.bg)
-        assert exc.value.code == "FILE_TOO_LARGE"
+    def test_file_too_large_aborts_and_cleans_partial_file(self, tmp_path, monkeypatch):
+        """流式上传超限：中止读取并删除半截文件"""
+        from app.services import import_service as mod
+        monkeypatch.setattr(mod, "UPLOAD_DIR", tmp_path / "uploads")
+        monkeypatch.setattr(mod, "MAX_FILE_SIZE", 10)
 
-    def test_valid_upload_registers_background_task(self, tmp_path, monkeypatch):
+        with pytest.raises(FileValidationError) as exc:
+            _submit(self.service, FakeUpload("big.pdf", [b"x" * 8, b"y" * 8]), self.bg)
+        assert exc.value.code == "FILE_TOO_LARGE"
+        assert list((tmp_path / "uploads").iterdir()) == []  # 半截文件已清理
+
+    def test_valid_upload_streams_to_disk(self, tmp_path, monkeypatch):
         # 上传目录定向到临时目录，避免污染项目目录
         from app.services import import_service as mod
         monkeypatch.setattr(mod, "UPLOAD_DIR", tmp_path / "uploads")
         monkeypatch.setattr(mod, "OUTPUT_DIR", tmp_path / "output")
 
-        result = self.service.submit_upload(b"pdf-content", "报告.pdf", self.bg)
+        upload = FakeUpload("报告.pdf", [b"pdf-", b"content"])
+        result = _submit(self.service, upload, self.bg)
 
         assert result["status"] == "processing"
         assert result["filename"] == "报告.pdf"
         assert len(self.bg.tasks) == 1  # 后台导入任务已注册
-        assert (tmp_path / "uploads").exists()
+        saved = list((tmp_path / "uploads").iterdir())[0]
+        assert saved.read_bytes() == b"pdf-content"  # 分块按序落盘
 
     def test_sanitize_filename_blocks_traversal(self):
         assert _sanitize_filename("../../etc/passwd") == "passwd"

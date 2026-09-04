@@ -6,6 +6,7 @@ import asyncio
 import os
 import re
 import uuid
+from typing import Protocol
 
 from app.core.exceptions import FileValidationError
 from app.core.logger import logger
@@ -26,6 +27,17 @@ OUTPUT_DIR = PROJECT_ROOT / "output"
 MAX_FILE_SIZE = 100 * 1024 * 1024
 # 允许的文件扩展名
 ALLOWED_EXTENSIONS = {".pdf", ".md"}
+# 流式落盘的读取块大小（1MB）
+UPLOAD_CHUNK_SIZE = 1024 * 1024
+
+
+class UploadStream(Protocol):
+    """上传流协议：与 fastapi.UploadFile 结构兼容，便于测试替身"""
+
+    filename: str
+
+    async def read(self, size: int = -1) -> bytes:
+        ...
 
 
 class ImportService:
@@ -42,14 +54,15 @@ class ImportService:
 
     # ---------- 上传 ----------
 
-    def submit_upload(self, content: bytes, filename: str, background_tasks) -> dict:
+    async def submit_upload(self, upload: UploadStream, background_tasks) -> dict:
         """
         校验并保存上传文件，注册后台导入任务
-        :param content: 文件二进制内容（路由层负责异步读取）
-        :param filename: 原始文件名
+        文件流式落盘（按块读取），避免大文件整体读入内存
+        :param upload: 上传流（filename + async read）
         :param background_tasks: FastAPI BackgroundTasks
         :return: {task_id, filename, status}
         """
+        filename = upload.filename or ""
         if not filename:
             raise FileValidationError("文件名不能为空")
 
@@ -59,24 +72,35 @@ class ImportService:
             raise FileValidationError(
                 f"不支持的文件格式: {file_ext}，仅支持 {', '.join(ALLOWED_EXTENSIONS)}"
             )
-        if len(content) > MAX_FILE_SIZE:
-            raise FileValidationError(
-                f"文件大小超过限制: {len(content) / 1024 / 1024:.1f}MB"
-                f" > {MAX_FILE_SIZE / 1024 / 1024:.0f}MB",
-                code="FILE_TOO_LARGE",
-            )
 
         task_id = str(uuid.uuid4())[:8]
 
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         saved_filename = f"{task_id}_{safe_filename}"
         saved_path = UPLOAD_DIR / saved_filename
-        with open(saved_path, "wb") as f:
-            f.write(content)
+
+        # 流式写入 + 大小限制（超限即中止并清理半截文件）
+        size = 0
+        try:
+            with open(saved_path, "wb") as f:
+                while True:
+                    chunk = await upload.read(UPLOAD_CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    if size > MAX_FILE_SIZE:
+                        raise FileValidationError(
+                            f"文件大小超过限制（上限 {MAX_FILE_SIZE / 1024 / 1024:.0f}MB）",
+                            code="FILE_TOO_LARGE",
+                        )
+                    f.write(chunk)
+        except Exception:
+            saved_path.unlink(missing_ok=True)
+            raise
 
         logger.info(
             f"文件上传成功: {saved_filename}，task_id: {task_id}，"
-            f"大小: {len(content) / 1024:.0f}KB"
+            f"大小: {size / 1024:.0f}KB"
         )
 
         file_stem = os.path.splitext(safe_filename)[0]
