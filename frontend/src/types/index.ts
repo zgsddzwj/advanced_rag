@@ -72,6 +72,20 @@ export interface HealthResponse {
   service: string
 }
 
+// 全链路健康聚合（演进5 /api/health）
+export interface HealthCheckItem {
+  ok: boolean
+  detail: string
+  elapsed_ms: number
+}
+
+export interface SystemHealth {
+  status: 'ok' | 'degraded'
+  checks: Record<string, HealthCheckItem>
+  caches?: Record<string, unknown>
+  cached?: boolean
+}
+
 // ==================== 文档预览 ====================
 
 export interface DocumentItem {

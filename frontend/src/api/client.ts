@@ -11,6 +11,7 @@ import type {
   DocumentListResponse,
   ChunkListResponse,
   RetrievalOptions,
+  SystemHealth,
 } from '@/types'
 
 const API_BASE = '/api'
@@ -93,6 +94,14 @@ export async function clearHistory(sessionId: string): Promise<{ session_id: str
 
 export async function healthCheck(): Promise<HealthResponse> {
   return request<HealthResponse>('/query/health')
+}
+
+/**
+ * 全链路健康聚合：并发探活 Mongo/Milvus/MinIO/Kafka，
+ * status 为 ok（全部可达）或 degraded（部分依赖异常）
+ */
+export async function getSystemHealth(): Promise<SystemHealth> {
+  return request<SystemHealth>('/api/health')
 }
 
 // ==================== 文档预览 API ====================

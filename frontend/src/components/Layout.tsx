@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
 import { LayoutDashboard, Upload, FileStack, MessageSquare, BookOpen, Activity } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { healthCheck } from '@/api/client'
+import { getSystemHealth } from '@/api/client'
 
 const navItems = [
   { to: '/', label: '系统首页', icon: LayoutDashboard },
@@ -10,13 +10,24 @@ const navItems = [
   { to: '/chat', label: '智能问答', icon: MessageSquare },
 ]
 
+type HealthState = 'ok' | 'degraded' | 'offline'
+
+const HEALTH_BADGE: Record<HealthState, { dot: string; text: string }> = {
+  ok: { dot: 'bg-green-400', text: '系统正常' },
+  degraded: { dot: 'bg-amber-400', text: '部分依赖异常' },
+  offline: { dot: 'bg-red-400', text: '服务离线' },
+}
+
 export default function Layout() {
   const location = useLocation()
-  const [online, setOnline] = useState(true)
+  const [health, setHealth] = useState<HealthState>('ok')
 
-  // 定期健康检查（每 30 秒）
+  // 定期健康检查（每 30 秒）：聚合端点探测全部下游依赖
   useEffect(() => {
-    const check = () => healthCheck().then(() => setOnline(true)).catch(() => setOnline(false))
+    const check = () =>
+      getSystemHealth()
+        .then(r => setHealth(r.status === 'degraded' ? 'degraded' : 'ok'))
+        .catch(() => setHealth('offline'))
     check()
     const timer = setInterval(check, 30000)
     return () => clearInterval(timer)
@@ -67,8 +78,8 @@ export default function Layout() {
 
         {/* 底部状态 */}
         <div className="px-6 py-4 border-t border-white/5 text-xs text-white/30 flex items-center gap-2">
-          <span className={`w-2 h-2 rounded-full ${online ? 'bg-green-400' : 'bg-red-400'}`} />
-          {online ? '服务运行中' : '服务离线'}
+          <span className={`w-2 h-2 rounded-full ${HEALTH_BADGE[health].dot}`} />
+          {HEALTH_BADGE[health].text}
         </div>
       </aside>
 
