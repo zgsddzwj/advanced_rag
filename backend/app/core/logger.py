@@ -3,9 +3,10 @@
 基于 loguru 实现，支持配置控制台/文件双输出（配置来自统一配置中心 settings）
 演进5：日志行自动携带 request_id（来自请求上下文，后台线程中为 "-"），
 同一请求的全部日志可通过 request_id 串联检索
+优化2：日志定位改用 sys._getframe 栈回溯，替代 inspect.stack()——
+后者为每条日志分配全栈 FrameInfo 元组（每条 10-50µs），日志是全系统热点路径
 """
 import sys
-import inspect
 from pathlib import Path
 
 from loguru import logger
@@ -18,6 +19,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE_NAME = "app_{time:YYYYMMDD}.log"
 LOG_FILE_PATH = LOG_DIR / LOG_FILE_NAME
+
+# 栈回溯深度上限（正常调用栈远小于此值，防御性兜底）
+_MAX_STACK_WALK = 30
 
 # 定义日志格式（request_id 由 fix_log_position 注入 extra）
 LOG_FORMAT = (
@@ -66,17 +70,28 @@ base_logger = init_logger()
 
 
 def fix_log_position(record):
-    """遍历调用栈，跳过 loguru 内部帧，定位业务代码实际调用位置；同时注入请求上下文"""
+    """
+    定位业务代码实际调用位置并注入请求上下文。
+    语义与原 inspect.stack() 版本一致（跳过 loguru 内部帧与本模块帧），
+    改用 frame.f_back 链回溯：零对象分配，等价遍历顺序。
+    """
     record["extra"]["request_id"] = get_request_id()
-    for frame in inspect.stack():
-        if ("_logger.py" in frame.filename or frame.function == "_log") or "logger.py" in frame.filename:
+
+    frame = sys._getframe()
+    for _ in range(_MAX_STACK_WALK):
+        if frame is None:
+            return
+        filename = frame.f_code.co_filename
+        func = frame.f_code.co_name
+        if ("_logger.py" in filename or "logger.py" in filename or func == "_log"):
+            frame = frame.f_back
             continue
         record.update(
-            name=frame.filename.split("/")[-1].split("\\")[-1],
-            function=frame.function,
-            line=frame.lineno
+            name=filename.split("/")[-1].split("\\")[-1],
+            function=func,
+            line=frame.f_lineno,
         )
-        break
+        return
 
 
 # 应用位置修复，导出全局 logger
