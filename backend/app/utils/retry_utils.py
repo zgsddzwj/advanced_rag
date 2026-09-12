@@ -3,12 +3,24 @@ API 调用重试工具
 为外部 API 调用（LLM、Embedding、Rerank 等）提供统一的重试机制
 """
 import time
+import random
 import functools
 from typing import Callable, TypeVar
 
 from app.core.logger import logger
 
 T = TypeVar("T")
+
+
+def compute_backoff_delay(attempt: int, base_delay: float, max_delay: float) -> float:
+    """
+    计算指数退避等待秒数（等量抖动 equal jitter）：
+    基础值 = min(base * 2^attempt, max)，实际值在 [基础值/2, 基础值] 内随机。
+    固定间隔会让多实例/多事件在故障恢复瞬间按同一节奏同步重试（重试风暴），
+    抖动将其打散。
+    """
+    base = min(base_delay * (2 ** attempt), max_delay)
+    return base / 2 + random.uniform(0, base / 2)
 
 
 def _sleep_between_retries(delay: float):
@@ -52,7 +64,7 @@ def with_retry(
                             f"{func.__name__} 重试 {max_retries} 次后仍失败: {e}"
                         )
                         raise
-                    delay = min(base_delay * (2 ** attempt), max_delay)
+                    delay = compute_backoff_delay(attempt, base_delay, max_delay)
                     logger.warning(
                         f"{func.__name__} 第 {attempt + 1}/{max_retries} 次重试，"
                         f"{delay:.1f}s 后执行，错误: {e}"

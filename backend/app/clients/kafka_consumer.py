@@ -23,6 +23,7 @@ from app.events.model import EventParseError, parse_event, get_handler
 from app.events import handlers  # noqa: F401 — 导入即完成处理器注册
 from app.repository.event_dedup_repository import get_event_dedup_repository
 from app.repository.document_meta_repository import get_document_meta_repository
+from app.utils.retry_utils import compute_backoff_delay
 
 # 消费者全局状态
 _consumer_task: Optional[asyncio.Task] = None
@@ -184,7 +185,7 @@ def _execute_with_retry(event):
                     exc_info=True,
                 )
                 raise
-            delay = min(base_delay * (2 ** attempt), 60.0)
+            delay = compute_backoff_delay(attempt, base_delay, 60.0)
             logger.warning(
                 f"事件处理失败 (attempt {attempt + 1}/{max_retry + 1}): "
                 f"{event.event_type} {event.file_title}, {delay:.1f}s 后重试, {e}"
