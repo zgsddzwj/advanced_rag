@@ -174,6 +174,24 @@ class TestChatHistoryRepository:
 
 
 class TestDocumentMetaRepository:
+    def test_file_title_unique_index_created_lazily(self, fake_coll):
+        """首次访问集合时创建 file_title 唯一索引"""
+        repo = DocumentMetaRepository(fake_coll)
+        repo.get("whatever")
+        assert "file_title" in fake_coll.indexes
+        # 重复访问不重复建索引
+        repo.get("whatever")
+        assert fake_coll.indexes.count("file_title") == 1
+
+    def test_index_failure_does_not_block_business(self, fake_coll, monkeypatch):
+        """索引创建失败（如存量重复数据）不阻塞正常读写"""
+        def broken_index(spec, **kwargs):
+            raise RuntimeError("duplicate keys")
+        fake_coll.create_index = broken_index
+        repo = DocumentMetaRepository(fake_coll)
+        repo.upsert("doc.pdf", content_hash="h")  # 不抛异常
+        assert repo.get("doc.pdf")["content_hash"] == "h"
+
     def test_upsert_returns_old_doc(self, fake_coll):
         repo = DocumentMetaRepository(fake_coll)
         first = repo.upsert("doc1.pdf", content_hash="h1", chunk_count=3)

@@ -100,13 +100,17 @@ class TestEventDedupRepository:
 
     def test_ttl_index_created(self):
         coll = _FakeDedupCollection()
-        EventDedupRepository(coll, ttl_days=7)
-        # find_one 触发 collection 属性 → 索引创建（expireAfterSeconds 存在）
-        assert coll.indexes == []  # 索引通过 create_index 调用注册
         repo = EventDedupRepository(coll, ttl_days=7)
         repo.is_processed("e")
         # FakeCollection.create_index 记录了调用参数
         assert any(idx == "processed_at" for idx in coll.indexes)
+
+    def test_event_id_dedup_index_created(self):
+        """幂等去重查找字段 event_id 必须有索引（此前只有 TTL 索引）"""
+        coll = _FakeDedupCollection()
+        repo = EventDedupRepository(coll, ttl_days=7)
+        repo.is_processed("e")
+        assert any(idx == "event_id" for idx in coll.indexes)
 
 
 # ============================================================

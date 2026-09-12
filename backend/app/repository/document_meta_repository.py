@@ -16,11 +16,20 @@ class DocumentMetaRepository:
 
     def __init__(self, collection: Optional[Any] = None):
         self._collection = collection
+        self._index_ready = False
 
     @property
     def collection(self):
         if self._collection is None:
             self._collection = get_mongo_db()[META_COLLECTION]
+        if not self._index_ready:
+            try:
+                # file_title 是全部查询的定位键；唯一索引同时兜底防止并发导入产生重复元数据
+                self._collection.create_index("file_title", unique=True)
+                self._index_ready = True
+            except Exception as e:
+                # 索引创建失败不阻塞业务（如存量重复数据），退化为集合扫描
+                logger.warning(f"创建 document_meta 索引失败（后续重试）: {e}")
         return self._collection
 
     def upsert(
