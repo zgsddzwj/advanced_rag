@@ -131,6 +131,8 @@ def reset():
         _counters.clear()
         _durations.clear()
         _gauges.clear()
+    with _help_lock:
+        _help_emitted.clear()
 
 
 # help 注释去重

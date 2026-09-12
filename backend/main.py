@@ -165,4 +165,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         timeout_graceful_shutdown=10,
+        access_log=False,  # 访问日志由 ObservabilityMiddleware 统一输出（含 request_id/耗时），避免重复
     )

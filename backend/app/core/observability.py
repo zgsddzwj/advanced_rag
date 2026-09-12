@@ -21,6 +21,10 @@ from app.core.logger import logger
 from app.core import metrics
 
 
+# 访问日志降噪：以下端点被监控/前端高频抓取，不逐条记录访问日志（指标照常上报）
+_ACCESS_LOG_EXCLUDED = {"/metrics", "/api/health"}
+
+
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     """RequestID 注入 + 请求指标 + 访问日志"""
 
@@ -53,7 +57,8 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             duration_ms / 1000,
             {"method": method, "route": route},
         )
-        logger.info(f"{method} {path} {status} {duration_ms:.1f}ms")
+        if path not in _ACCESS_LOG_EXCLUDED:
+            logger.info(f"{method} {path} {status} {duration_ms:.1f}ms")
 
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time-Ms"] = f"{duration_ms:.1f}"
