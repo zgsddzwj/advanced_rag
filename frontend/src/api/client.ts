@@ -16,6 +16,10 @@ import type {
 
 const API_BASE = '/api'
 
+// 默认请求超时；上传大文件放宽
+const DEFAULT_TIMEOUT_MS = 30_000
+const UPLOAD_TIMEOUT_MS = 120_000
+
 // ==================== 统一响应信封（演进2） ====================
 
 export interface ApiEnvelope<T> {
@@ -36,23 +40,41 @@ export class ApiError extends Error {
   }
 }
 
+function isAbortError(e: unknown): boolean {
+  return e instanceof DOMException && e.name === 'AbortError'
+}
+
 /**
  * 请求后端并解包统一响应信封 {code, message, data}
+ * - 超时（AbortController）或网络中断：抛出 TIMEOUT 类 ApiError
  * - 非 2xx 或 code !== 'OK'：抛出携带后端真实错误消息的 ApiError
  * - 成功：直接返回 data（页面代码无需感知信封结构）
  */
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`, init)
-  let body: ApiEnvelope<T>
+async function request<T>(path: string, init?: RequestInit, timeoutMs: number = DEFAULT_TIMEOUT_MS): Promise<T> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    body = await resp.json()
-  } catch {
-    throw new ApiError('BAD_RESPONSE', `响应解析失败: ${resp.status}`, resp.status)
+    const resp = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal })
+    let body: ApiEnvelope<T>
+    try {
+      body = await resp.json()
+    } catch (e) {
+      if (isAbortError(e)) throw e
+      throw new ApiError('BAD_RESPONSE', `响应解析失败: ${resp.status}`, resp.status)
+    }
+    if (!resp.ok || body.code !== 'OK') {
+      throw new ApiError(body.code ?? 'HTTP_ERROR', body.message ?? `请求失败: ${resp.status}`, resp.status)
+    }
+    return body.data
+  } catch (e) {
+    if (e instanceof ApiError) throw e
+    if (isAbortError(e)) {
+      throw new ApiError('TIMEOUT', `请求超时（${Math.round(timeoutMs / 1000)}s），请稍后重试`, 408)
+    }
+    throw e
+  } finally {
+    clearTimeout(timer)
   }
-  if (!resp.ok || body.code !== 'OK') {
-    throw new ApiError(body.code ?? 'HTTP_ERROR', body.message ?? `请求失败: ${resp.status}`, resp.status)
-  }
-  return body.data
 }
 
 // ==================== 导入 API ====================
@@ -63,7 +85,7 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
   return request<UploadResponse>('/import/upload', {
     method: 'POST',
     body: formData,
-  })
+  }, UPLOAD_TIMEOUT_MS)
 }
 
 export async function getImportStatus(taskId: string): Promise<ImportStatusResponse> {
