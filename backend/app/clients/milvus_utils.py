@@ -147,25 +147,27 @@ def hybrid_search(
     collection_name: str,
     reqs: List[AnnSearchRequest],
     limit: int = 5,
-    output_fields: List[str] = None
+    output_fields: List[str] = None,
+    rrf_k: Optional[int] = None,
 ) -> List[List[Dict]]:
     """
     执行 Milvus 混合检索
     :param client: MilvusClient 实例
     :param collection_name: 集合名称
     :param reqs: 混合搜索请求列表
-    :param ranker_weights: Dense/BM25 权重配比
     :param limit: 最终返回数量
     :param output_fields: 返回字段
+    :param rrf_k: RRF 平滑因子；缺省读统一配置 milvus_rrf_k（演进前固定 60）
     :return: 检索结果
     """
     if output_fields is None:
         output_fields = ["chunk_id", "content", "item_name", "title", "file_title"]
 
+    k = rrf_k if rrf_k is not None else settings.milvus_rrf_k
     result = client.hybrid_search(
         collection_name=collection_name,
         reqs=reqs,
-        ranker=RRFRanker(k=60),
+        ranker=RRFRanker(k=k),
         limit=limit,
         output_fields=output_fields
     )

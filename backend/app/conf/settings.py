@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     milvus_url: str = "http://localhost:19530"
     chunks_collection: str = "kb_chunks"
     item_names_collection: str = "kb_item_names"
+    # Dense+BM25 两路召回的 Milvus 内部 RRF 融合 k（应用层三路融合的 rrf_k 由检索策略配置）
+    milvus_rrf_k: int = Field(default=60, ge=1, le=1000)
 
     # ===================== MinIO =====================
     minio_endpoint: str = "localhost:9000"

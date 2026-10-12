@@ -90,7 +90,7 @@ class _FakeMilvusClient:
         pass
 
     def hybrid_search(self, collection_name=None, reqs=None, ranker=None, limit=None, output_fields=None):
-        self.search_calls.append({"limit": limit, "reqs": reqs})
+        self.search_calls.append({"limit": limit, "reqs": reqs, "ranker": ranker})
         return [[{"chunk_id": 1, "content": "c", "title": "t", "parent_title": "pt",
                   "part": 0, "file_title": "f", "item_name": "i"}]]
 
@@ -120,6 +120,44 @@ class TestMilvusHybridRetriever:
         monkeypatch.setattr("app.clients.milvus_utils.get_milvus_client", lambda: _FakeMilvusClient(has_collection=False))
         retriever = MilvusHybridRetriever(name="embedding", source="embedding")
         assert retriever.retrieve("q", [], top_k=5) == []
+
+
+class _FakeRRFRanker:
+    def __init__(self, k=60):
+        self.k = k
+
+
+class TestMilvusRRFConfig:
+    """优化：Milvus 两路召回的 RRF k 由统一配置驱动（默认 60 行为不变）"""
+
+    def test_default_k_from_settings(self, monkeypatch):
+        from app.clients import milvus_utils as mu
+        fake = _FakeMilvusClient()
+        captured = {}
+        monkeypatch.setattr(mu, "RRFRanker", _FakeRRFRanker)
+        monkeypatch.setattr(mu.settings, "milvus_rrf_k", 60)
+
+        mu.hybrid_search(client=fake, collection_name="c", reqs=[], limit=5)
+        captured["ranker"] = fake.search_calls[0]["ranker"]
+        assert captured["ranker"].k == 60
+
+    def test_custom_k_from_settings(self, monkeypatch):
+        from app.clients import milvus_utils as mu
+        fake = _FakeMilvusClient()
+        monkeypatch.setattr(mu, "RRFRanker", _FakeRRFRanker)
+        monkeypatch.setattr(mu.settings, "milvus_rrf_k", 120)
+
+        mu.hybrid_search(client=fake, collection_name="c", reqs=[], limit=5)
+        assert fake.search_calls[0]["ranker"].k == 120
+
+    def test_explicit_k_overrides_settings(self, monkeypatch):
+        from app.clients import milvus_utils as mu
+        fake = _FakeMilvusClient()
+        monkeypatch.setattr(mu, "RRFRanker", _FakeRRFRanker)
+        monkeypatch.setattr(mu.settings, "milvus_rrf_k", 120)
+
+        mu.hybrid_search(client=fake, collection_name="c", reqs=[], limit=5, rrf_k=30)
+        assert fake.search_calls[0]["ranker"].k == 30
 
 
 class TestRRFParameterized:
