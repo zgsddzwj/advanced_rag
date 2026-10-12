@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from pymilvus import MilvusClient
 
 from app.core.logger import logger
-from app.utils.escape_milvus_string_utils import escape_milvus_string
+from app.utils.escape_milvus_string_utils import eq_filter
 
 # 预览/聚合场景只取必要字段，避免全量 content 传输
 _DOC_AGG_FIELDS = ["file_title", "item_name", "title"]
@@ -64,7 +64,7 @@ class MilvusRepository:
             logger.warning(f"集合 {name} 不存在，跳过删除")
             return False
         self._load(name)
-        self.client.delete(collection_name=name, filter=f'file_title=="{escape_milvus_string(file_title)}"')
+        self.client.delete(collection_name=name, filter=eq_filter('file_title', file_title))
         logger.info(f"已从 {name} 删除 file_title={file_title} 的 chunks")
         return True
 
@@ -107,7 +107,7 @@ class MilvusRepository:
         self._load(name)
         chunks = self.client.query(
             collection_name=name,
-            filter=f'file_title=="{escape_milvus_string(file_title)}"',
+            filter=eq_filter('file_title', file_title),
             output_fields=_CHUNK_FIELDS,
             limit=limit,
         )
@@ -122,7 +122,7 @@ class MilvusRepository:
         self._load(name)
         results = self.client.query(
             collection_name=name,
-            filter=f'file_title=="{escape_milvus_string(file_title)}"',
+            filter=eq_filter('file_title', file_title),
             output_fields=["file_title"],
             limit=1,
         )
@@ -137,7 +137,7 @@ class MilvusRepository:
             logger.warning(f"集合 {name} 不存在，跳过删除")
             return False
         self._load(name)
-        self.client.delete(collection_name=name, filter=f'file_title=="{escape_milvus_string(file_title)}"')
+        self.client.delete(collection_name=name, filter=eq_filter('file_title', file_title))
         logger.info(f"已从 {name} 删除 file_title={file_title} 的记录")
         return True
 
@@ -146,7 +146,7 @@ class MilvusRepository:
         name = _settings().item_names_collection
         self._load(name)
         if item_name:
-            self.client.delete(collection_name=name, filter=f'item_name=="{escape_milvus_string(item_name)}"')
+            self.client.delete(collection_name=name, filter=eq_filter('item_name', item_name))
         data: Dict[str, Any] = {"file_title": file_title, "item_name": item_name}
         if dense_vector:
             data["dense_vector"] = dense_vector
