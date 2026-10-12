@@ -39,3 +39,10 @@ dev = [
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
 ]
+
+[tool.pytest.ini_options]
+# 默认安静模式 + 全局告警过滤（starlette testclient 的 httpx 迁移告警与业务无关）
+addopts = "-q"
+filterwarnings = [
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
