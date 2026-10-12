@@ -144,7 +144,9 @@ async def _process_message(raw: dict):
     # 3. 线程池执行（含指数重试）
     start = time.perf_counter()
     try:
-        loop = asyncio.get_event_loop()
+        # 此处必在运行中的事件循环内（消费者协程），用 get_running_loop
+        # 规避 get_event_loop 在无当前 loop 上下文中的弃用告警与隐式建连
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, _execute_with_retry, event)
         metrics.observe_duration(
             "kafka_event_duration_seconds", time.perf_counter() - start, {"type": event.event_type}
