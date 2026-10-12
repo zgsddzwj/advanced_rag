@@ -102,9 +102,18 @@ advanced_rag/
 │   ├── main.py                          #   FastAPI 主应用入口
 │   │
 │   ├── app/
-│   │   ├── core/                        #   核心工具
-│   │   │   ├── logger.py                #     日志 (loguru)
-│   │   │   └── load_prompt.py           #     Prompt 模板加载器
+│   │   ├── core/                        #   核心工具与横切面
+│   │   │   ├── logger.py                #     日志 (loguru, request_id 关联)
+│   │   │   ├── load_prompt.py           #     Prompt 模板加载器
+│   │   │   ├── context.py               #     请求上下文 (RequestID, contextvars)
+│   │   │   ├── exceptions.py            #     业务异常体系 (AppError)
+│   │   │   ├── response.py              #     统一响应信封 {code, message, data}
+│   │   │   ├── error_handlers.py        #     全局异常处理器
+│   │   │   ├── metrics.py               #     进程内指标注册表
+│   │   │   ├── observability.py         #     可观测中间件 (RequestID/指标/访问日志)
+│   │   │   ├── health.py                #     健康聚合 (并发探活 + 10s 缓存)
+│   │   │   ├── cache.py                 #     TTLCache 抽象 (LRU+TTL+统计)
+│   │   │   └── app_caches.py            #     业务缓存注册 (embedding/hyde/web/alignment)
 │   │   ├── conf/                        #   配置层（演进1: 统一配置中心）
 │   │   │   ├── settings.py              #     pydantic-settings 统一配置（单一配置源 + 启动校验 + 密钥脱敏）
 │   │   │   ├── lm_config.py             #     [兼容层] AI 模型配置（委托 settings）
@@ -122,7 +131,11 @@ advanced_rag/
 │   │   │   ├── mongo_connection.py      #     MongoDB 懒加载连接管理器
 │   │   │   ├── chat_history_repository.py  #  对话历史仓储
 │   │   │   ├── document_meta_repository.py #  文档元数据仓储
-│   │   │   └── milvus_repository.py     #     Milvus chunks/item_names 仓储
+│   │   │   ├── milvus_repository.py     #     Milvus chunks/item_names 仓储
+│   │   │   └── event_dedup_repository.py   #  事件幂等去重仓储 (TTL)
+│   │   ├── events/                      #   事件域 (演进6)
+│   │   │   ├── model.py                 #     DocumentEvent + 处理器注册表
+│   │   │   └── handlers.py              #     ADD/UPDATE/DELETE 处理器
 │   │   ├── services/                    #   服务层 (演进4: 用例编排)
 │   │   │   ├── import_service.py        #     导入用例 (上传校验/任务编排/事件发布)
 │   │   │   ├── query_service.py         #     问答用例 (SSE 编排/后台执行/历史)
@@ -137,10 +150,11 @@ advanced_rag/
 │   │   │   └── kafka_consumer.py        #     Kafka 消费者 (增量同步)
 │   │   ├── utils/                       #   通用工具
 │   │   │   ├── task_utils.py            #     任务状态管理
-│   │   │   ├── sse_utils.py             #     SSE 事件队列
+│   │   │   ├── sse_utils.py             #     SSE 事件队列 (心跳/超时可配置)
 │   │   │   ├── thinking_utils.py        #     思考过程推送
+│   │   │   ├── retry_utils.py           #     重试退避 (指数 + 随机抖动)
 │   │   │   ├── path_util.py             #     项目路径工具
-│   │   │   └── escape_milvus_string_utils.py
+│   │   │   └── escape_milvus_string_utils.py  # Milvus 字符串转义/过滤构造
 │   │   ├── import_process/              #   导入流程
 │   │   │   ├── agent/
 │   │   │   │   ├── state.py             #     ImportGraphState
@@ -158,7 +172,8 @@ advanced_rag/
 │   │       └── api/query_service.py
 │   │
 │   ├── prompts/                         #   Prompt 模板
-│   ├── test/                            #   测试脚本
+│   ├── test/                            #   图结构与端到端测试脚本
+│   ├── tests/                           #   pytest 单元测试（135 个，不依赖基础设施）
 │   ├── examples/                        #   示例 PDF
 │   └── logs/                            #   运行日志
 │
@@ -288,13 +303,34 @@ cd frontend && npm run dev
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/query/ask` | 提交查询 |
+| POST | `/api/query/ask` | 提交查询（可选 `retrieval` 检索策略） |
 | GET | `/api/query/stream/{task_id}` | SSE 流式回答 |
 | GET | `/api/query/history/{session_id}` | 获取对话历史 |
 | DELETE | `/api/query/history/{session_id}` | 清空对话历史 |
 | GET | `/api/query/health` | 健康检查 |
-| GET | `/api/health` | 全链路健康聚合（并发探活 Mongo/Milvus/MinIO/Kafka，演进5） |
-| GET | `/metrics` | Prometheus 文本格式指标（请求计数/耗时/SSE 队列，演进5） |
+| GET | `/api/health` | 全链路健康聚合（并发探活 Mongo/Milvus/MinIO/Kafka） |
+| GET | `/metrics` | Prometheus 文本格式指标（请求计数/耗时/SSE 队列/缓存） |
+
+#### 按请求检索策略（演进7）
+
+`/api/query/ask` 请求体可选携带 `retrieval` 字段，按请求调整检索管线；全部字段缺省时沿用服务端默认（行为与历史版本一致）：
+
+```json
+{
+  "query": "设备的技术参数有哪些？",
+  "session_id": "abc123",
+  "retrieval": {
+    "enable_hyde": true,          // 是否执行 HyDE 补充检索
+    "enable_web_search": null,    // 三态：null=按结果数自动判断 / true=强制 / false=关闭
+    "top_k": 10,                  // 每路检索返回文档数 (1-30)
+    "rrf_k": 60,                  // 应用层 RRF 平滑因子
+    "rrf_output_limit": 15,       // RRF 融合后送入 Rerank 的数量上限
+    "web_search_count": 5         // 联网搜索结果数
+  }
+}
+```
+
+前端聊天页提供对应开关（HyDE 勾选框 + 联网搜索三态下拉）。
 
 ### 文档预览 API
 
@@ -350,15 +386,42 @@ cd frontend && npm run dev
 ```bash
 cd backend
 
+# 单元测试（135 个，内存替身模拟基础设施，无需启动任何服务）
+uv run pytest tests/ -q
+
 # 导入图结构测试
 uv run python test/02_import_graph_flow.py
 
 # 检索图结构测试（含 RRF 算法验证）
 uv run python test/03_query_graph_flow.py
 
-# 端到端集成测试（10 项验证）
+# 端到端集成测试（10 项验证，需要基础设施运行）
 uv run python test/04_e2e_integration_test.py
 ```
+
+## 工程优化记录
+
+在 8 次架构演进（见 [docs/architecture-evolution.md](docs/architecture-evolution.md)）之后，
+陆续完成 15 项工程优化（按提交顺序）：
+
+**性能**
+- 上传文件流式落盘（按 1MB 块写入，消除 100MB 峰值内存）
+- `/api/health` 探活结果 10s 缓存，监控高频抓取不打下游
+- Mongo 关键查询补索引（`document_meta.file_title` 唯一索引、`processed_events.event_id`）
+- 日志定位改用 `_getframe` 栈回溯，消除每条日志的全栈分配
+- 重试退避加入随机抖动（等量抖动），避免故障恢复瞬间的重试风暴
+- Milvus 混合检索 RRF 参数接入配置（`MILVUS_RRF_K`，默认 60）
+- Embedding / HyDE / 联网搜索 / 主题对齐 四级 TTL 缓存（演进8）
+- 前端 vendor 手动分包（543KB 单文件 → 45KB 业务 + 164KB/335KB 长缓存 vendor）
+- 回答配图懒加载（`loading=lazy`）
+
+**可靠性 / 可维护性**
+- 访问日志降噪（uvicorn access log 关闭、监控端点静默），日志定位零分配
+- SSE 心跳/超时参数配置化，默认值与历史行为一致
+- Milvus 等值过滤表达式统一构造（`eq_filter`），转义逻辑单点维护
+- `get_event_loop` → `get_running_loop`，消除 3.12 弃用告警
+- 前端请求统一 30s 超时保护（上传 120s），超时抛结构化 `ApiError`
+- 侧边栏健康状态三态化（正常 / 部分依赖异常 / 离线），基于聚合探活端点
 
 ## 项目成熟度评估
 
@@ -375,8 +438,9 @@ uv run python test/04_e2e_integration_test.py
 | **基础设施** | Docker Compose 一键编排（Milvus + MinIO + MongoDB + etcd） |
 | **配置管理** | .env 环境变量 + 启动时自动校验 |
 | **文档预览** | 支持查看已导入文档列表及切分详情 |
-| **消息队列** | Kafka 事件驱动，文档变更实时同步 chunks |
-| **结构测试** | 导入图/检索图/端到端集成测试（10 项验证） |
+| **消息队列** | Kafka 事件驱动，文档变更实时同步 chunks（幂等消费 + 死信队列） |
+| **可观测性** | RequestID 链路追踪 + Prometheus 指标 + 健康聚合 |
+| **结构测试** | pytest 单元测试 135 个（不依赖基础设施）+ 导入图/检索图/端到端集成测试 |
 
 ### ⚠️ 距离生产级还需补齐
 
