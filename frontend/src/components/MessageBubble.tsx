@@ -89,7 +89,14 @@ function MessageBubble({ msg, streaming }: { msg: ChatMessage; streaming?: boole
         {msg.image_urls && msg.image_urls.length > 0 && (
           <div className="mt-2 space-y-2">
             {msg.image_urls.map((url, i) => (
-              <img key={i} src={url} alt="" className="max-w-full rounded-lg shadow-sm" />
+              <img
+                key={i}
+                src={url}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                className="max-w-full rounded-lg shadow-sm"
+              />
             ))}
           </div>
         )}
