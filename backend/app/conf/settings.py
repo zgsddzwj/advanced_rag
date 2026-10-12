@@ -117,6 +117,11 @@ class Settings(BaseSettings):
     web_search_cache_ttl_seconds: int = Field(default=1800, ge=60, description="联网搜索缓存 TTL（30min）")
     alignment_cache_ttl_seconds: int = Field(default=600, ge=60, description="主题对齐缓存 TTL（10min）")
 
+    # ===================== SSE（原硬编码 → 配置化） =====================
+    sse_heartbeat_interval_seconds: float = Field(default=15.0, gt=0, description="SSE 心跳注释间隔（兼做断连探测周期）")
+    sse_queue_wait_timeout_seconds: float = Field(default=10.0, gt=0, description="等待 SSE 队列创建的超时")
+    sse_queue_max_age_seconds: float = Field(default=600.0, gt=0, description="被遗弃 SSE 队列的最大存活时间")
+
     # ===================== 校验器 =====================
 
     @field_validator("log_console_level", "log_file_level", mode="before")

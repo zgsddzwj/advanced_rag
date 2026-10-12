@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Dict, Any, Optional
 from app.core.logger import logger
 from app.core import metrics
+from app.conf.settings import settings
 
 __all__ = [
     "SSEEvent",
@@ -18,6 +19,9 @@ __all__ = [
     "sse_generator",
     "cleanup_stale_queues",
 ]
+
+# SSE 轮询步长（秒）：等待队列创建的检查间隔
+_QUEUE_WAIT_POLL_INTERVAL = 0.1
 
 
 class SSEEvent(Enum):
@@ -38,8 +42,6 @@ _sse_loops: Dict[str, asyncio.AbstractEventLoop] = {}
 _sse_create_times: Dict[str, float] = {}
 # 活跃消费者集合：sse_generator 正在消费的 session，清理时必须跳过
 _sse_active_consumers: set = set()
-# 被遗弃队列的最大存活时间（秒）
-SSE_QUEUE_MAX_AGE = 600  # 10 分钟
 
 
 def create_sse_queue(session_id: str, loop: Optional[asyncio.AbstractEventLoop] = None):
@@ -96,12 +98,13 @@ async def sse_generator(session_id: str, request=None):
     SSE 事件生成器
     从队列消费事件，按 SSE 格式 yield
     """
-    # 等待队列创建
+    # 等待队列创建（超时可配置）
+    max_waits = max(1, int(settings.sse_queue_wait_timeout_seconds / _QUEUE_WAIT_POLL_INTERVAL))
     wait_count = 0
     while session_id not in _sse_queues:
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_QUEUE_WAIT_POLL_INTERVAL)
         wait_count += 1
-        if wait_count > 100:  # 10 秒超时
+        if wait_count > max_waits:
             yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列创建超时'})}\n\n"
             return
 
@@ -128,7 +131,7 @@ async def sse_generator(session_id: str, request=None):
                 pass
 
         try:
-            msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+            msg = await asyncio.wait_for(queue.get(), timeout=settings.sse_heartbeat_interval_seconds)
         except asyncio.TimeoutError:
             # 发送心跳，同时检测客户端是否还在线
             try:
@@ -169,12 +172,12 @@ async def sse_generator(session_id: str, request=None):
 
 
 def cleanup_stale_queues():
-    """清理被遗弃的 SSE 队列（创建超过 SSE_QUEUE_MAX_AGE 且无活跃消费者）"""
+    """清理被遗弃的 SSE 队列（创建超过 sse_queue_max_age_seconds 且无活跃消费者）"""
     now = time.time()
     stale_ids = [
         sid for sid, create_ts in _sse_create_times.items()
         if sid not in _sse_active_consumers
-        and now - create_ts > SSE_QUEUE_MAX_AGE
+        and now - create_ts > settings.sse_queue_max_age_seconds
     ]
     for sid in stale_ids:
         _sse_queues.pop(sid, None)
