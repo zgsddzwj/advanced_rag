@@ -114,10 +114,6 @@ if FRONTEND_DIST.exists():
 
 # ==================== 前端页面路由 (SPA) ====================
 
-# 已知的前端路由列表
-SPA_ROUTES = {"/", "/import", "/chat"}
-
-
 @app.get("/")
 async def index():
     """首页"""
