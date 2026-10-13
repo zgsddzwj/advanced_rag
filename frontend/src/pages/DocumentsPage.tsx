@@ -18,7 +18,11 @@ export default function DocumentsPage() {
     setError('')
     try {
       const data = await getDocumentList()
-      setDocuments(data.documents || [])
+      // Milvus 返回顺序不稳定，按标题排序保证刷新时列表不跳动
+      const docs = [...(data.documents || [])].sort((a, b) =>
+        a.file_title.localeCompare(b.file_title, 'zh-Hans-CN'),
+      )
+      setDocuments(docs)
     } catch (e) {
       setError((e as Error).message)
     } finally {
