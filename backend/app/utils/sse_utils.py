@@ -105,20 +105,20 @@ async def sse_generator(session_id: str, request=None):
         await asyncio.sleep(_QUEUE_WAIT_POLL_INTERVAL)
         wait_count += 1
         if wait_count > max_waits:
-            yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列创建超时'})}\n\n"
+            yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列创建超时'}, ensure_ascii=False)}\n\n"
             return
 
     queue = _sse_queues.get(session_id)
     if queue is None:
         # 队列在等待期间已被并发清理
-        yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列已被清理'})}\n\n"
+        yield f"event: error\ndata: {json.dumps({'message': 'SSE 队列已被清理'}, ensure_ascii=False)}\n\n"
         return
 
     # 标记活跃消费者，防止 cleanup_stale_queues 误杀长连接
     _sse_active_consumers.add(session_id)
 
     # 发送 ready 事件
-    yield f"event: ready\ndata: {json.dumps({'session_id': session_id})}\n\n"
+    yield f"event: ready\ndata: {json.dumps({'session_id': session_id}, ensure_ascii=False)}\n\n"
 
     while True:
         # 检测客户端是否已断开连接

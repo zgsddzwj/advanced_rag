@@ -88,7 +88,7 @@ class TestSSEGeneratorFlow:
         assert "sid-flow" not in _sse_queues  # 流结束后清理
 
     def test_queue_wait_timeout_message(self, monkeypatch):
-        """队列迟迟未创建：按配置超时返回 error 事件"""
+        """队列迟迟未创建：按配置超时返回 error 事件，且中文明文（不转义 \\uXXXX）"""
         import json as _json
         monkeypatch.setattr(settings, "sse_queue_wait_timeout_seconds", 0.2)
 
@@ -102,4 +102,5 @@ class TestSSEGeneratorFlow:
         error_events = [e for e in events if e.startswith("event: error")]
         assert error_events, f"未收到 error 事件: {events}"
         data_line = next(l for l in error_events[0].splitlines() if l.startswith("data:"))
+        assert "队列创建超时" in data_line  # 原始报文即中文，抓包/日志可读
         assert "队列创建超时" in _json.loads(data_line[len("data:"):])["message"]
