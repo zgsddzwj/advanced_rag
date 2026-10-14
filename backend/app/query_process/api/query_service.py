@@ -51,6 +51,19 @@ class QueryRequest(BaseModel):
             raise ValueError("查询内容过长，请限制在 2000 字以内")
         return v
 
+    @field_validator("session_id")
+    @classmethod
+    def validate_session_id(cls, v: str) -> str:
+        """
+        会话 ID 作为 MongoDB 查询键与 SSE 队列键使用：
+        去除首尾空白并限制长度，防止异常客户端写入超长键
+        （空值合法，服务端会自动生成）
+        """
+        v = v.strip()
+        if len(v) > 64:
+            raise ValueError("session_id 过长，请限制在 64 字符以内")
+        return v
+
 
 @router.post("/ask")
 async def ask(req: QueryRequest, service: QueryService = Depends(get_query_service)):
