@@ -68,14 +68,14 @@ def _cleanup_expired_tasks():
 
 
 def _ensure_task(task_id: str):
-    """确保任务存在于字典中"""
+    """确保任务存在于字典中；首次写入任务时才启动清理线程（消除 import 副作用）"""
+    _start_cleanup_thread()
     with _store_lock:
         if task_id not in _task_store:
             _task_store[task_id] = {
                 "status": TASK_STATUS_PENDING,
                 "done_list": [],
                 "running_list": [],
-                "results": {}
             }
 
 
@@ -143,25 +143,9 @@ def get_running_task_list(task_id: str) -> List[str]:
         return list(_task_store[task_id]["running_list"])
 
 
-def set_task_result(task_id: str, key: str, value: Any):
-    """存储任务结果数据"""
-    _ensure_task(task_id)
-    with _store_lock:
-        _task_store[task_id]["results"][key] = value
-
-
-def get_task_result(task_id: str, key: str, default: Any = None) -> Any:
-    """获取任务结果数据"""
-    _ensure_task(task_id)
-    with _store_lock:
-        return _task_store[task_id]["results"].get(key, default)
-
-
 def get_all_task_ids() -> List[str]:
     """获取所有任务 ID 列表"""
     with _store_lock:
         return list(_task_store.keys())
 
-
-# 启动自动清理线程
-_start_cleanup_thread()
+# 清理线程改为首个任务写入时启动（_ensure_task 内），不再在模块导入期产生线程
