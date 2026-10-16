@@ -22,6 +22,9 @@ export default function ImportPage() {
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 轮询连续失败计数：超过上限停止轮询（如服务重启丢失内存任务状态，避免无限轮询）
+  const POLL_MAX_FAILURES = 5
+  const pollFailRef = useRef(0)
 
   // 组件卸载时清理轮询定时器
   useEffect(() => {
@@ -61,6 +64,7 @@ export default function ImportPage() {
     if (!selectedFile) return
     setUploading(true)
     setResultBanner(null)
+    pollFailRef.current = 0
     try {
       const data = await uploadFile(selectedFile)
       setTaskId(data.task_id)
@@ -72,6 +76,7 @@ export default function ImportPage() {
       const poll = async () => {
         try {
           const s = await getImportStatus(data.task_id)
+          pollFailRef.current = 0
           setStatus(s)
           if (s.status === 'completed') {
             setResultBanner({ type: 'success', msg: `导入完成！文件 "${selectedFile.name}" 已成功写入知识库。` })
@@ -82,6 +87,11 @@ export default function ImportPage() {
           }
         } catch (e) {
           console.error('轮询失败:', e)
+          pollFailRef.current += 1
+          if (pollFailRef.current >= POLL_MAX_FAILURES) {
+            setResultBanner({ type: 'error', msg: '无法查询导入状态（服务可能已重启或任务已丢失），请刷新页面后重新导入。' })
+            return
+          }
         }
         pollDelay = Math.min(pollDelay * 1.5, maxDelay)
         pollRef.current = setTimeout(poll, pollDelay)
@@ -99,6 +109,7 @@ export default function ImportPage() {
     setTaskId('')
     setStatus(null)
     setResultBanner(null)
+    pollFailRef.current = 0
     if (pollRef.current) clearTimeout(pollRef.current)
   }
 
