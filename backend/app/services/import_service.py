@@ -148,19 +148,16 @@ class ImportService:
             old_hash = old_meta.get("content_hash", "") if old_meta else ""
             event_type = "DOCUMENT_UPDATE" if old_hash and old_hash != content_hash else "DOCUMENT_ADD"
 
-            # 发布 Kafka 事件（同步函数中创建事件循环）
+            # 发布 Kafka 事件（同步函数中创建独立事件循环，失败不影响导入结果）
             try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.run_until_complete(publish_document_event(
+                _publish_import_event(
                     event_type=event_type,
                     file_title=file_title,
                     file_path=file_path,
                     content_hash=content_hash,
                     chunk_count=chunk_count,
                     item_name=item_name,
-                ))
-                loop.close()
+                )
             except Exception as e:
                 logger.warning(f"Kafka 事件发布失败（不影响导入结果）: {e}")
 
@@ -170,3 +167,28 @@ class ImportService:
         except Exception as e:
             logger.error(f"导入流程失败，task_id: {task_id}，错误: {str(e)}", exc_info=True)
             update_task_status(task_id, TASK_STATUS_FAILED)
+
+
+def _publish_import_event(
+    event_type: str,
+    file_title: str,
+    file_path: str,
+    content_hash: str,
+    chunk_count: int,
+    item_name: str,
+) -> None:
+    """
+    在独立事件循环中同步发布 Kafka 事件。
+    此前手写 new_event_loop + run_until_complete + close：publish 抛异常时
+    close 被跳过，每次发布失败都泄漏一个事件循环。改用 asyncio.Runner
+    （上下文管理器，无论成败循环必关，且自动清理当前线程的 loop 引用）。
+    """
+    with asyncio.Runner() as runner:
+        runner.run(publish_document_event(
+            event_type=event_type,
+            file_title=file_title,
+            file_path=file_path,
+            content_hash=content_hash,
+            chunk_count=chunk_count,
+            item_name=item_name,
+        ))
