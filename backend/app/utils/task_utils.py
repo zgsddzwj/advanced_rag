@@ -18,6 +18,10 @@ TASK_STATUS_FAILED = "failed"
 TASK_TTL_SECONDS = 3600  # 1 小时
 # 清理检查间隔（秒）
 CLEANUP_INTERVAL = 600  # 10 分钟
+# 未终结任务的兜底清理时长（秒）：导入流程可能较长（PDF 云端解析），
+# 取任务 TTL 的 6 倍，避免误伤仍在执行的正常任务；超过此时长仍无终态的
+# 任务视为僵死任务（如服务重启丢失执行线程），一并清理防内存泄漏
+STUCK_TASK_TTL_SECONDS = TASK_TTL_SECONDS * 6
 
 # 全局任务状态字典
 _task_store: Dict[str, Dict[str, Any]] = {}
@@ -53,18 +57,28 @@ def _cleanup_loop():
 
 
 def _cleanup_expired_tasks():
-    """清理过期的已完成/失败任务"""
+    """
+    清理过期任务：
+    - 终态任务（completed/failed）超过 TASK_TTL_SECONDS
+    - 未终结任务超过 STUCK_TASK_TTL_SECONDS（僵死任务：执行线程已丢失，
+      永远不会再有终态，此前会永久滞留内存）
+    """
     now = time.time()
     with _store_lock:
         expired_ids = [
             task_id for task_id, done_ts in _task_done_timestamp.items()
             if now - done_ts > TASK_TTL_SECONDS
         ]
-        for task_id in expired_ids:
+        stuck_ids = [
+            task_id for task_id, task in _task_store.items()
+            if task_id not in _task_done_timestamp
+            and now - task.get("created_at", now) > STUCK_TASK_TTL_SECONDS
+        ]
+        for task_id in expired_ids + stuck_ids:
             _task_store.pop(task_id, None)
             _task_done_timestamp.pop(task_id, None)
-    if expired_ids:
-        logger.info(f"清理过期任务: {len(expired_ids)} 个")
+    if expired_ids or stuck_ids:
+        logger.info(f"清理过期任务: {len(expired_ids)} 个（终态）, {len(stuck_ids)} 个（僵死）")
 
 
 def _ensure_task(task_id: str):
@@ -76,6 +90,7 @@ def _ensure_task(task_id: str):
                 "status": TASK_STATUS_PENDING,
                 "done_list": [],
                 "running_list": [],
+                "created_at": time.time(),
             }
 
 
@@ -123,24 +138,28 @@ def add_done_task(task_id: str, node_name: str, is_stream: bool = False):
 
 
 def get_task_status(task_id: str) -> str:
-    """获取任务全局状态"""
-    _ensure_task(task_id)
+    """
+    获取任务全局状态
+    未知任务返回 pending 且不创建条目（读路径零创建，防止轮询
+    不存在的 task_id 造成内存泄漏）
+    """
     with _store_lock:
-        return _task_store[task_id]["status"]
+        task = _task_store.get(task_id)
+        return task["status"] if task else TASK_STATUS_PENDING
 
 
 def get_done_task_list(task_id: str) -> List[str]:
-    """获取已完成节点列表"""
-    _ensure_task(task_id)
+    """获取已完成节点列表（读路径零创建）"""
     with _store_lock:
-        return list(_task_store[task_id]["done_list"])
+        task = _task_store.get(task_id)
+        return list(task["done_list"]) if task else []
 
 
 def get_running_task_list(task_id: str) -> List[str]:
-    """获取运行中节点列表"""
-    _ensure_task(task_id)
+    """获取运行中节点列表（读路径零创建）"""
     with _store_lock:
-        return list(_task_store[task_id]["running_list"])
+        task = _task_store.get(task_id)
+        return list(task["running_list"]) if task else []
 
 
 def get_all_task_ids() -> List[str]:

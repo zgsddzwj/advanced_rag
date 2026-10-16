@@ -49,3 +49,33 @@ class TestTaskUtilsHygiene:
         assert task_utils.get_task_status("t1") == task_utils.TASK_STATUS_PENDING
         assert task_utils.get_done_task_list("t1") == ["node_a"]
         assert task_utils.get_running_task_list("t1") == []
+
+    def test_read_unknown_task_creates_nothing(self):
+        """轮询不存在的 task_id 不再创建条目（读路径零创建，防内存泄漏）"""
+        assert task_utils.get_task_status("ghost") == task_utils.TASK_STATUS_PENDING
+        assert task_utils.get_done_task_list("ghost") == []
+        assert task_utils.get_running_task_list("ghost") == []
+        assert "ghost" not in task_utils._task_store
+
+    def test_stuck_task_cleaned_up(self, monkeypatch):
+        """超时仍未终结的僵死任务被兜底清理，新任务不受影响"""
+        task_utils.add_running_task("zombie", "node_a")
+        # 把僵尸任务的创建时间拨回 7 小时前
+        task_utils._task_store["zombie"]["created_at"] = (
+            __import__("time").time() - task_utils.STUCK_TASK_TTL_SECONDS - 3600
+        )
+        task_utils.add_running_task("fresh", "node_a")
+
+        task_utils._cleanup_expired_tasks()
+
+        assert "zombie" not in task_utils._task_store
+        assert "fresh" in task_utils._task_store
+
+    def test_terminal_task_ttl_cleanup_still_works(self):
+        """终态任务按原有 TTL 清理，行为不变"""
+        task_utils.update_task_status("done1", task_utils.TASK_STATUS_COMPLETED)
+        task_utils._task_done_timestamp["done1"] = (
+            __import__("time").time() - task_utils.TASK_TTL_SECONDS - 10
+        )
+        task_utils._cleanup_expired_tasks()
+        assert "done1" not in task_utils._task_store
