@@ -7,8 +7,9 @@ import asyncio
 import pytest
 
 from app.core.exceptions import FileValidationError, NotFoundError
-from app.services.import_service import ImportService, _sanitize_filename
+from app.services.import_service import ImportService
 from app.services.document_service import DocumentService
+from app.utils.file_utils import sanitize_filename, validate_upload_name
 
 
 class _FakeBackground:
@@ -77,10 +78,17 @@ class TestImportServiceValidation:
         assert saved.read_bytes() == b"pdf-content"  # 分块按序落盘
 
     def test_sanitize_filename_blocks_traversal(self):
-        assert _sanitize_filename("../../etc/passwd") == "passwd"
-        assert _sanitize_filename("..\\win\\evil.pdf") == "evil.pdf"
-        assert _sanitize_filename("normal.pdf") == "normal.pdf"
-        assert _sanitize_filename("a<b>:c?.pdf") == "a_b__c_.pdf"
+        assert sanitize_filename("../../etc/passwd") == "passwd"
+        assert sanitize_filename("..\\win\\evil.pdf") == "evil.pdf"
+        assert sanitize_filename("normal.pdf") == "normal.pdf"
+        assert sanitize_filename("a<b>:c?.pdf") == "a_b__c_.pdf"
+
+    def test_validate_upload_name_extension_whitelist(self):
+        assert validate_upload_name("报告.pdf") == "报告.pdf"
+        with pytest.raises(FileValidationError):
+            validate_upload_name("doc.docx")
+        with pytest.raises(FileValidationError):
+            validate_upload_name("")
 
 
 class TestDocumentServiceDelete:
@@ -164,6 +172,46 @@ class TestDocumentServiceDelete:
 
         assert fake_milvus.checked is False
         assert published["event_type"] == "DOCUMENT_DELETE"
+
+
+class TestDocumentServiceReimport:
+    def test_reimport_sanitizes_filename(self, tmp_path, monkeypatch):
+        """重导入路径必须与上传路径同样清洗文件名（防目录遍历）"""
+        from app.services import document_service as mod
+        monkeypatch.setattr(mod, "UPLOAD_DIR", tmp_path / "uploads")
+
+        class FakeMeta:
+            def get(self, title):
+                return {"file_title": title}
+
+        async def fake_publish(**kwargs):
+            return True
+
+        monkeypatch.setattr(mod, "publish_document_event", fake_publish)
+        upload = FakeUpload("../../evil.pdf", [b"data"])
+        service = DocumentService(meta_repo=FakeMeta(), milvus_repo=object())
+
+        result = asyncio.run(service.reimport_document("doc", upload))
+        assert result["status"] == "processing"
+        # 落盘文件名不含任何路径分隔符
+        saved = list((tmp_path / "uploads").iterdir())
+        assert len(saved) == 1
+        assert "/" not in saved[0].name and "\\" not in saved[0].name
+        assert saved[0].name.endswith("evil.pdf")
+
+    def test_reimport_rejects_bad_extension(self, tmp_path, monkeypatch):
+        from app.services import document_service as mod
+        monkeypatch.setattr(mod, "UPLOAD_DIR", tmp_path / "uploads")
+
+        class FakeMeta:
+            def get(self, title):
+                return None
+
+        upload = FakeUpload("virus.exe", [b"data"])
+        service = DocumentService(meta_repo=FakeMeta(), milvus_repo=object())
+        with pytest.raises(FileValidationError):
+            asyncio.run(service.reimport_document("doc", upload))
+        assert not (tmp_path / "uploads").exists()  # 未写任何文件
 
 
 class TestDependencyProviders:

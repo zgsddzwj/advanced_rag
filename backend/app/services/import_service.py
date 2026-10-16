@@ -4,12 +4,14 @@
 """
 import asyncio
 import os
-import re
 import uuid
 from typing import Protocol
 
 from app.core.exceptions import FileValidationError
 from app.core.logger import logger
+from app.utils.file_utils import (
+    ALLOWED_EXTENSIONS, MAX_FILE_SIZE, sanitize_filename, validate_upload_name,
+)
 from app.utils.path_util import PROJECT_ROOT
 from app.utils.task_utils import (
     update_task_status, get_task_status,
@@ -23,10 +25,6 @@ from app.clients.kafka_producer import publish_document_event
 UPLOAD_DIR = PROJECT_ROOT / "uploads"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
-# 文件大小限制：100MB
-MAX_FILE_SIZE = 100 * 1024 * 1024
-# 允许的文件扩展名
-ALLOWED_EXTENSIONS = {".pdf", ".md"}
 # 流式落盘的读取块大小（1MB）
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 
@@ -62,16 +60,7 @@ class ImportService:
         :param background_tasks: FastAPI BackgroundTasks
         :return: {task_id, filename, status}
         """
-        filename = upload.filename or ""
-        if not filename:
-            raise FileValidationError("文件名不能为空")
-
-        safe_filename = _sanitize_filename(filename)
-        file_ext = os.path.splitext(safe_filename)[1].lower()
-        if file_ext not in ALLOWED_EXTENSIONS:
-            raise FileValidationError(
-                f"不支持的文件格式: {file_ext}，仅支持 {', '.join(ALLOWED_EXTENSIONS)}"
-            )
+        safe_filename = validate_upload_name(upload.filename or "")
 
         task_id = str(uuid.uuid4())[:8]
 
@@ -181,16 +170,3 @@ class ImportService:
         except Exception as e:
             logger.error(f"导入流程失败，task_id: {task_id}，错误: {str(e)}", exc_info=True)
             update_task_status(task_id, TASK_STATUS_FAILED)
-
-
-def _sanitize_filename(filename: str) -> str:
-    """
-    安全化文件名：移除路径分隔符和特殊字符
-    防止目录遍历攻击
-    """
-    filename = os.path.basename(filename)
-    filename = re.sub(r'[\x00-\x1f<>:"/\\|?*]', '_', filename)
-    if len(filename) > 200:
-        name, ext = os.path.splitext(filename)
-        filename = name[:200 - len(ext)] + ext
-    return filename

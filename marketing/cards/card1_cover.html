@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1080px; height:1440px; font-family:'Microsoft YaHei','PingFang SC',sans-serif; overflow:hidden; }
+  .card {
+    width:1080px; height:1440px; position:relative; overflow:hidden;
+    background: linear-gradient(150deg,#17123a 0%,#2b1e6e 45%,#4338ca 100%);
+    color:#fff;
+  }
+  .glow1 { position:absolute; width:640px; height:640px; border-radius:50%;
+    background:radial-gradient(circle,rgba(129,140,248,.35),transparent 70%); top:-180px; right:-160px; }
+  .glow2 { position:absolute; width:560px; height:560px; border-radius:50%;
+    background:radial-gradient(circle,rgba(236,72,153,.22),transparent 70%); bottom:-140px; left:-140px; }
+  .grid { position:absolute; inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),
+                     linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+    background-size:56px 56px; }
+  .inner { position:relative; height:100%; padding:88px 84px; display:flex; flex-direction:column; }
+  .chip { display:inline-flex; align-items:center; gap:12px; padding:14px 30px; border-radius:999px;
+    border:1.5px solid rgba(165,180,252,.55); background:rgba(99,102,241,.18);
+    font-size:30px; letter-spacing:2px; color:#c7d2fe; width:fit-content; }
+  .chip .dot { width:14px; height:14px; border-radius:50%; background:#34d399; }
+  h1 { margin-top:66px; font-size:108px; font-weight:900; line-height:1.16; letter-spacing:2px; }
+  h1 .grad { background:linear-gradient(92deg,#a5b4fc 0%,#67e8f9 55%,#f0abfc 100%);
+    -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .sub { margin-top:30px; font-size:44px; color:#c7d2fe; font-weight:700; letter-spacing:3px; }
+  .desc { margin-top:26px; font-size:31px; line-height:1.75; color:rgba(226,232,240,.88); }
+  .desc b { color:#fbbf24; }
+  .techs { margin-top:56px; display:flex; flex-wrap:wrap; gap:20px; }
+  .tech { padding:16px 28px; border-radius:16px; font-size:29px; font-weight:700;
+    background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16); color:#e0e7ff; }
+  .metrics { margin-top:auto; display:flex; gap:24px; }
+  .metric { flex:1; padding:30px 26px; border-radius:22px; background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.14); }
+  .metric .num { font-size:56px; font-weight:900; color:#fbbf24; }
+  .metric .lbl { margin-top:8px; font-size:26px; color:rgba(226,232,240,.75); }
+  .footer { margin-top:44px; padding-top:34px; border-top:1px solid rgba(255,255,255,.18);
+    display:flex; justify-content:space-between; align-items:center; font-size:27px; color:rgba(199,210,254,.9); }
+  .footer b { color:#fff; }
+</style>
+</head>
+<body>
+  <div class="card" id="card">
+    <div class="glow1"></div><div class="glow2"></div><div class="grid"></div>
+    <div class="inner">
+      <div class="chip"><span class="dot"></span>开源作品 · Open Source</div>
+      <h1>十年大厂程序员<br><span class="grad">企业级 RAG 系统</span><br>完整开源</h1>
+      <div class="sub">丢进去一个 PDF · 得到一个流式问答知识库</div>
+      <div class="desc">双 LangGraph 流水线 × 混合检索 × 事件驱动，<br>从架构演进到单元测试，<b>工程化细节全部公开</b></div>
+      <div class="techs">
+        <span class="tech">FastAPI</span><span class="tech">LangGraph</span>
+        <span class="tech">Milvus</span><span class="tech">Kafka</span>
+        <span class="tech">React 18</span><span class="tech">通义千问</span>
+      </div>
+      <div class="metrics">
+        <div class="metric"><div class="num">8 次</div><div class="lbl">架构演进全记录</div></div>
+        <div class="metric"><div class="num">145 个</div><div class="lbl">单元测试</div></div>
+        <div class="metric"><div class="num">14 个</div><div class="lbl">流水线节点</div></div>
+      </div>
+      <div class="footer"><span>GitHub · <b>zgsddzwj/advanced_rag</b></span><span>全栈 · 单人完成</span></div>
+    </div>
+  </div>
+</body>
+</html>

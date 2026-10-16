@@ -7,6 +7,7 @@ import uuid
 
 from app.core.exceptions import NotFoundError, UpstreamServiceError
 from app.core.logger import logger
+from app.utils.file_utils import validate_upload_name
 from app.utils.path_util import PROJECT_ROOT
 from app.clients.document_meta_utils import compute_content_hash
 from app.clients.kafka_producer import publish_document_event
@@ -114,10 +115,11 @@ class DocumentService:
         Kafka 消费者将先删除旧 chunks，再重新导入
         :param upload: 上传流（filename + async read）
         """
-        filename = upload.filename or ""
+        # 与上传路径一致的安全校验：清洗文件名 + 扩展名白名单（防目录遍历/任意类型写入）
+        safe_filename = validate_upload_name(upload.filename or "")
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         task_id = str(uuid.uuid4())[:8]
-        saved_filename = f"{task_id}_{filename}"
+        saved_filename = f"{task_id}_{safe_filename}"
         saved_path = UPLOAD_DIR / saved_filename
         with open(saved_path, "wb") as f:
             while True:
