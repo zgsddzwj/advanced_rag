@@ -263,22 +263,31 @@ export default function ChatPage() {
           </label>
         </div>
         <div className="flex gap-3 items-end">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={handleInput}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                sendQuery()
-              }
-            }}
-            placeholder="输入你的问题... (Shift+Enter 换行)"
-            disabled={waiting}
-            rows={1}
-            className="flex-1 px-4 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 resize-none"
-            style={{ maxHeight: '120px' }}
-          />
+          <div className="relative flex-1">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={handleInput}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  sendQuery()
+                }
+              }}
+              maxLength={2000}
+              placeholder="输入你的问题... (Shift+Enter 换行)"
+              disabled={waiting}
+              rows={1}
+              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 resize-none"
+              style={{ maxHeight: '120px' }}
+            />
+            {/* 接近后端 2000 字上限时显示计数 */}
+            {input.length > 1800 && (
+              <span className={`absolute right-3 bottom-2 text-xs ${input.length >= 2000 ? 'text-red-500' : 'text-gray-400'}`}>
+                {input.length}/2000
+              </span>
+            )}
+          </div>
           <button
             onClick={() => sendQuery()}
             disabled={waiting || !input.trim()}
