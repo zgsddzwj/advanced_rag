@@ -78,12 +78,18 @@ body {
 }
 .dark .markdown-body code { color: #f87171; }
 .markdown-body pre {
-  margin: 0.75rem 0;
+  margin: 0;
 }
 .markdown-body pre code {
   background: none;
   color: inherit;
   padding: 0;
+}
+/* 代码块容器（CodeBlock）内的 hljs 由外层容器提供底色与圆角 */
+.code-block .hljs {
+  margin: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .markdown-body blockquote {
   border-left: 4px solid #a5b4fc;
