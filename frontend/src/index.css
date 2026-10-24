@@ -2,16 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==================== 设计变量（演进：设计系统） ==================== */
 :root {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', Roboto, sans-serif;
+
+  /* 应用底色：亮色 */
+  --app-bg: #f0f2f5;
+  /* 内容表面 */
+  --surface: #ffffff;
+  --border: #e5e7eb;
+  --text-1: #1f2937;
+  --text-2: #6b7280;
 }
+
+.dark {
+  --app-bg: #0b1120;
+  --surface: #0f172a;
+  --border: #1e293b;
+  --text-1: #e2e8f0;
+  --text-2: #94a3b8;
+}
+
+html { color-scheme: light; }
+html.dark { color-scheme: dark; }
 
 body {
   margin: 0;
-  background: #f0f2f5;
+  background: var(--app-bg);
+  color: var(--text-1);
 }
 
-/* highlight.js 代码高亮主题 */
+/* ==================== 通用卡片表面 ==================== */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+/* ==================== highlight.js 代码高亮主题 ==================== */
 .hljs {
   background: #1e1e2e;
   color: #cdd6f4;
@@ -33,7 +60,8 @@ body {
 .hljs-tag { color: #f38ba8; }
 .hljs-name { color: #f38ba8; }
 
-/* Markdown 渲染样式 */
+/* ==================== Markdown 渲染样式 ==================== */
+.markdown-body { color: var(--text-1); }
 .markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.75rem; }
 .markdown-body h2 { font-size: 1.3rem; font-weight: 600; margin: 1rem 0 0.5rem; }
 .markdown-body h3 { font-size: 1.15rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
@@ -41,13 +69,14 @@ body {
 .markdown-body ul, .markdown-body ol { margin: 0.5rem 0; padding-left: 1.5rem; }
 .markdown-body li { margin: 0.25rem 0; line-height: 1.7; }
 .markdown-body code {
-  background: #f3f4f6;
+  background: rgba(99, 102, 241, 0.08);
   color: #dc2626;
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 0.875em;
   font-family: 'Fira Code', 'Consolas', monospace;
 }
+.dark .markdown-body code { color: #f87171; }
 .markdown-body pre {
   margin: 0.75rem 0;
 }
@@ -57,10 +86,10 @@ body {
   padding: 0;
 }
 .markdown-body blockquote {
-  border-left: 4px solid #d1d5db;
+  border-left: 4px solid #a5b4fc;
   padding-left: 1rem;
   margin: 0.75rem 0;
-  color: #6b7280;
+  color: var(--text-2);
 }
 .markdown-body table {
   border-collapse: collapse;
@@ -71,18 +100,21 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 .markdown-body th, .markdown-body td {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border);
   padding: 8px 12px;
   text-align: left;
   white-space: nowrap;
 }
-.markdown-body th { background: #f9fafb; font-weight: 600; }
+.markdown-body th { background: rgba(99, 102, 241, 0.06); font-weight: 600; }
 .markdown-body img { max-width: 100%; border-radius: 8px; margin: 0.5rem 0; }
 .markdown-body a { color: #6366f1; text-decoration: underline; }
-.markdown-body hr { border: none; border-top: 1px solid #e5e7eb; margin: 1rem 0; }
+.dark .markdown-body a { color: #818cf8; }
+.markdown-body hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 
-/* 滚动条 */
+/* ==================== 滚动条 ==================== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.dark ::-webkit-scrollbar-thumb { background: #334155; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }

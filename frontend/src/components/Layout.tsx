@@ -1,7 +1,8 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Upload, FileStack, MessageSquare, BookOpen, Activity } from 'lucide-react'
+import { LayoutDashboard, Upload, FileStack, MessageSquare, BookOpen, Activity, Sun, Moon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { getSystemHealth } from '@/api/client'
+import { useTheme } from '@/components/ThemeProvider'
 
 const navItems = [
   { to: '/', label: '系统首页', icon: LayoutDashboard },
@@ -20,6 +21,7 @@ const HEALTH_BADGE: Record<HealthState, { dot: string; text: string }> = {
 
 export default function Layout() {
   const location = useLocation()
+  const { theme, toggle } = useTheme()
   const [health, setHealth] = useState<HealthState>('ok')
 
   // 定期健康检查（每 30 秒）：聚合端点探测全部下游依赖
@@ -86,11 +88,19 @@ export default function Layout() {
       {/* 主内容区 */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* 顶栏 */}
-        <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
-          <h1 className="text-lg font-semibold text-gray-800">{pageTitle}</h1>
-          <div className="flex items-center gap-2 text-sm text-gray-400">
+        <header className="bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 px-8 py-4 flex items-center justify-between flex-shrink-0 transition-colors">
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-slate-100">{pageTitle}</h1>
+          <div className="flex items-center gap-3 text-sm text-gray-400 dark:text-slate-400">
             <Activity size={16} />
-            <span>LangGraph + Milvus + 百炼</span>
+            <span className="hidden md:inline">LangGraph + Milvus + 百炼</span>
+            <button
+              onClick={toggle}
+              aria-label={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+              title={theme === 'dark' ? '切换到亮色模式' : '切换到暗色模式'}
+              className="p-2 rounded-lg text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-700 dark:hover:text-slate-200 transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+            </button>
           </div>
         </header>
 
