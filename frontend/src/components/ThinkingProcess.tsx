@@ -48,14 +48,14 @@ export default function ThinkingProcess() {
 
   return (
     <div className="flex justify-start mb-2">
-      <div className="max-w-[80%] bg-white border border-indigo-100 rounded-2xl rounded-bl-md shadow-sm overflow-hidden">
+      <div className="max-w-[80%] bg-white dark:bg-slate-900 border border-indigo-100 dark:border-slate-700 rounded-2xl rounded-bl-md shadow-sm overflow-hidden transition-colors">
         {/* 头部 */}
         <div
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-gray-50/80 transition-colors"
+          className="flex items-center gap-2.5 px-4 py-2.5 cursor-pointer hover:bg-gray-50/80 dark:hover:bg-slate-800/60 transition-colors"
         >
           <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-            allDone ? 'bg-green-100' : 'bg-indigo-100'
+            allDone ? 'bg-green-100 dark:bg-green-500/20' : 'bg-indigo-100 dark:bg-indigo-500/20'
           }`}>
             {allDone ? (
               <CheckCircle2 size={14} className="text-green-600" />
@@ -63,7 +63,7 @@ export default function ThinkingProcess() {
               <Loader2 size={14} className="text-indigo-500 animate-spin" />
             )}
           </div>
-          <span className="text-xs font-medium text-gray-600 flex-1">
+          <span className="text-xs font-medium text-gray-600 dark:text-slate-300 flex-1">
             {allDone ? '思考完成' : currentStep?.message || '思考中...'}
           </span>
           {collapsed ? (
@@ -79,7 +79,7 @@ export default function ThinkingProcess() {
             {steps.map((step, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  step.done ? 'bg-green-50' : 'bg-amber-50'
+                  step.done ? 'bg-green-50 dark:bg-green-500/15' : 'bg-amber-50 dark:bg-amber-500/15'
                 }`}>
                   {step.done ? (
                     <CheckCircle2 size={10} className="text-green-500" />
@@ -88,7 +88,7 @@ export default function ThinkingProcess() {
                   )}
                 </div>
                 <span className={`flex items-center gap-1 ${
-                  step.done ? 'text-gray-400' : 'text-gray-700 font-medium'
+                  step.done ? 'text-gray-400 dark:text-slate-500' : 'text-gray-700 dark:text-slate-300 font-medium'
                 }`}>
                   <Brain size={11} className={step.done ? 'text-gray-300' : 'text-indigo-400'} />
                   {step.detail || step.message}

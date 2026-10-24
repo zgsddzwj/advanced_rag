@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Plus, MessageCircle, Loader2 } from 'lucide-react'
-import { ask, listenStream, getHistory, clearHistory } from '@/api/client'
+import { Send, Plus, MessageCircle, Loader2, ArrowDown } from 'lucide-react'
+import { ask, listenStream, getHistory } from '@/api/client'
 import type { ChatMessage, SSEThinkingData } from '@/types'
 import MessageBubble from '@/components/MessageBubble'
 import TypingIndicator from '@/components/TypingIndicator'
@@ -43,6 +43,8 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const sseRef = useRef<EventSource | null>(null)
+  // 用户是否停留在底部附近：不在底部时暂停自动滚动并显示「回到底部」按钮
+  const [atBottom, setAtBottom] = useState(true)
 
   // 加载历史
   useEffect(() => {
@@ -64,6 +66,20 @@ export default function ChatPage() {
     if (distanceFromBottom < 120) {
       el.scrollTop = el.scrollHeight
     }
+  }, [])
+
+  // 「回到底部」按钮：无视当前滚动位置强制置底
+  const forceScrollToBottom = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    setAtBottom(true)
+  }, [])
+
+  const handleChatScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 120)
   }, [])
 
   useEffect(() => {
@@ -179,67 +195,84 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-full">
       {/* 顶部操作 */}
-      <div className="flex items-center justify-between px-8 py-3 bg-white border-b border-gray-100">
-        <span className="text-sm text-gray-400">
+      <div className="flex items-center justify-between px-8 py-3 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 transition-colors">
+        <span className="text-sm text-gray-400 dark:text-slate-500">
           {sessionId ? `Session: ${sessionId}` : '新对话'}
         </span>
         <button
           onClick={newSession}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 hover:text-indigo-600 border border-gray-200 hover:border-indigo-300 rounded-lg transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 border border-gray-200 dark:border-slate-700 hover:border-indigo-300 rounded-lg transition-colors"
         >
           <Plus size={15} /> 新对话
         </button>
       </div>
 
       {/* 聊天区域 */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
-        {isEmpty ? (
-          <div className="flex flex-col items-center justify-center h-full text-center gap-4">
-            <div className="w-16 h-16 bg-indigo-50 rounded-2xl flex items-center justify-center">
-              <MessageCircle size={32} className="text-indigo-500" />
-            </div>
-            <div>
-              <h2 className="text-xl font-semibold text-gray-700 mb-2">欢迎使用 NexusRAG</h2>
-              <p className="text-sm text-gray-400 max-w-md">
-                基于多路混合检索 (Dense + BM25 + HyDE + 网络搜索)，为您提供精准的智能问答服务。
-              </p>
-            </div>
-            <div className="flex gap-3 flex-wrap justify-center mt-2">
-              {SUGGESTIONS.map(s => (
-                <button
-                  key={s}
-                  onClick={() => quickAsk(s)}
-                  className="px-4 py-2 text-sm bg-white border border-gray-200 rounded-full text-gray-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors"
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id || nextMsgId()} msg={msg} />
-            ))}
-            {(showTyping || waiting) && <ThinkingProcess />}
-            {showTyping && <TypingIndicator />}
-            {progressNodes.running.length > 0 && (
-              <div className="flex items-center gap-2 text-xs text-gray-400 px-2">
-                <Loader2 size={12} className="animate-spin" />
-                {progressNodes.running.map(n => QUERY_NODE_LABELS[n] || n).join(' · ')}
+      <div className="relative flex-1 min-h-0">
+        <div
+          ref={scrollRef}
+          onScroll={handleChatScroll}
+          className="h-full overflow-y-auto px-4 md:px-8 py-6 space-y-4"
+        >
+          {isEmpty ? (
+            <div className="flex flex-col items-center justify-center h-full text-center gap-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <MessageCircle size={30} className="text-white" />
               </div>
-            )}
-            {streamingText && (
-              <MessageBubble msg={{ id: 'streaming', role: 'assistant', text: streamingText }} streaming />
-            )}
-          </>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-700 dark:text-slate-200 mb-2">欢迎使用 NexusRAG</h2>
+                <p className="text-sm text-gray-400 dark:text-slate-500 max-w-md">
+                  基于多路混合检索 (Dense + BM25 + HyDE + 网络搜索)，为您提供精准的智能问答服务。
+                </p>
+              </div>
+              <div className="flex gap-3 flex-wrap justify-center mt-2">
+                {SUGGESTIONS.map(s => (
+                  <button
+                    key={s}
+                    onClick={() => quickAsk(s)}
+                    className="px-4 py-2 text-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full text-gray-500 dark:text-slate-400 hover:border-indigo-300 dark:hover:border-indigo-500 hover:text-indigo-600 dark:hover:text-indigo-300 transition-colors"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id || nextMsgId()} msg={msg} />
+              ))}
+              {(showTyping || waiting) && <ThinkingProcess />}
+              {showTyping && <TypingIndicator />}
+              {progressNodes.running.length > 0 && (
+                <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-slate-500 px-2">
+                  <Loader2 size={12} className="animate-spin" />
+                  {progressNodes.running.map(n => QUERY_NODE_LABELS[n] || n).join(' · ')}
+                </div>
+              )}
+              {streamingText && (
+                <MessageBubble msg={{ id: 'streaming', role: 'assistant', text: streamingText }} streaming />
+              )}
+            </>
+          )}
+        </div>
+
+        {/* 回到底部按钮：用户上滑查看历史时显示 */}
+        {!atBottom && !isEmpty && (
+          <button
+            onClick={forceScrollToBottom}
+            aria-label="回到底部"
+            className="absolute bottom-4 right-6 p-2.5 rounded-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 shadow-lg text-gray-500 dark:text-slate-300 hover:text-indigo-500 dark:hover:text-indigo-400 hover:border-indigo-300 transition-colors"
+          >
+            <ArrowDown size={17} />
+          </button>
         )}
       </div>
 
       {/* 输入区域 */}
-      <div className="px-8 py-4 bg-white border-t border-gray-100">
+      <div className="px-4 md:px-8 py-4 bg-white dark:bg-slate-900 border-t border-gray-100 dark:border-slate-800 transition-colors">
         {/* 检索策略开关（演进7） */}
-        <div className="flex items-center gap-4 mb-2 text-xs text-gray-500">
+        <div className="flex items-center gap-4 mb-2 text-xs text-gray-500 dark:text-slate-400">
           <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
             <input
               type="checkbox"
@@ -254,7 +287,7 @@ export default function ChatPage() {
             <select
               value={webSearchMode}
               onChange={e => setWebSearchMode(e.target.value as 'auto' | 'on' | 'off')}
-              className="border border-gray-200 rounded px-1 py-0.5 text-xs text-gray-600 focus:outline-none focus:border-indigo-300"
+              className="border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded px-1 py-0.5 text-xs text-gray-600 dark:text-slate-300 focus:outline-none focus:border-indigo-300"
             >
               <option value="auto">自动判断</option>
               <option value="on">强制开启</option>
@@ -278,7 +311,7 @@ export default function ChatPage() {
               placeholder="输入你的问题... (Shift+Enter 换行)"
               disabled={waiting}
               rows={1}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:bg-gray-50 resize-none"
+              className="w-full px-4 py-3 border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-gray-800 dark:text-slate-200 rounded-lg text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:focus:ring-indigo-500/20 disabled:bg-gray-50 dark:disabled:bg-slate-800 resize-none transition-colors"
               style={{ maxHeight: '120px' }}
             />
             {/* 接近后端 2000 字上限时显示计数 */}
