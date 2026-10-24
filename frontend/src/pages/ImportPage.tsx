@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { uploadFile, getImportStatus } from '@/api/client'
 import { IMPORT_NODES, type ImportStatusResponse } from '@/types'
+import { useToast } from '@/components/Toast'
 
 const iconMap: Record<string, LucideIcon> = {
   DoorOpen, FileText, ImageIcon, Scissors, Tag, Hash, Database,
@@ -14,6 +15,7 @@ const iconMap: Record<string, LucideIcon> = {
 type NodeStatus = 'pending' | 'running' | 'done' | 'failed'
 
 export default function ImportPage() {
+  const toast = useToast()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const [taskId, setTaskId] = useState<string>('')
@@ -36,12 +38,12 @@ export default function ImportPage() {
   const handleFileSelect = useCallback((file: File) => {
     const ext = file.name.split('.').pop()?.toLowerCase()
     if (!['pdf', 'md'].includes(ext || '')) {
-      alert('仅支持 PDF 或 Markdown 文件')
+      toast.error('仅支持 PDF 或 Markdown 文件')
       return
     }
     setSelectedFile(file)
     setResultBanner(null)
-  }, [])
+  }, [toast])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()

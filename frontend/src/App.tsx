@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Layout from '@/components/Layout'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 // 路由级代码分割：每个页面独立 chunk，首屏只加载当前页
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
@@ -27,10 +28,10 @@ export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route path="/" element={<Suspense fallback={<PageSkeleton />}><Dashboard /></Suspense>} />
-        <Route path="/import" element={<Suspense fallback={<PageSkeleton />}><ImportPage /></Suspense>} />
-        <Route path="/documents" element={<Suspense fallback={<PageSkeleton />}><DocumentsPage /></Suspense>} />
-        <Route path="/chat" element={<Suspense fallback={<PageSkeleton />}><ChatPage /></Suspense>} />
+        <Route path="/" element={<Suspense fallback={<PageSkeleton />}><ErrorBoundary><Dashboard /></ErrorBoundary></Suspense>} />
+        <Route path="/import" element={<Suspense fallback={<PageSkeleton />}><ErrorBoundary><ImportPage /></ErrorBoundary></Suspense>} />
+        <Route path="/documents" element={<Suspense fallback={<PageSkeleton />}><ErrorBoundary><DocumentsPage /></ErrorBoundary></Suspense>} />
+        <Route path="/chat" element={<Suspense fallback={<PageSkeleton />}><ErrorBoundary><ChatPage /></ErrorBoundary></Suspense>} />
       </Route>
     </Routes>
   )
