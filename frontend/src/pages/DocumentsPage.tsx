@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  FileText, ChevronLeft, Hash, Tag, Layers, RefreshCw, FileStack,
+  FileText, ChevronLeft, Hash, Tag, Layers, RefreshCw, Loader2, FileStack,
   AlertCircle, Search, ArrowRight, RotateCcw,
 } from 'lucide-react'
 import { getDocumentList, getDocumentChunks } from '@/api/client'
