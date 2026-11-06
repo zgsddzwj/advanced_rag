@@ -67,11 +67,6 @@ export interface SSEErrorData {
   message: string
 }
 
-export interface HealthResponse {
-  status: string
-  service: string
-}
-
 // 全链路健康聚合（演进5 /api/health）
 export interface HealthCheckItem {
   ok: boolean

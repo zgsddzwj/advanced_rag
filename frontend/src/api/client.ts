@@ -3,7 +3,6 @@ import type {
   ImportStatusResponse,
   AskResponse,
   HistoryResponse,
-  HealthResponse,
   SSEDeltaData,
   SSEFinalData,
   SSEErrorData,
@@ -112,10 +111,6 @@ export async function getHistory(sessionId: string): Promise<HistoryResponse> {
 
 export async function clearHistory(sessionId: string): Promise<{ session_id: string; deleted: number }> {
   return request<{ session_id: string; deleted: number }>(`/query/history/${sessionId}`, { method: 'DELETE' })
-}
-
-export async function healthCheck(): Promise<HealthResponse> {
-  return request<HealthResponse>('/query/health')
 }
 
 /**
