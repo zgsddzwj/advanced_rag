@@ -24,6 +24,9 @@ from app.core import metrics
 # 访问日志降噪：以下端点被监控/前端高频抓取，不逐条记录访问日志（指标照常上报）
 _ACCESS_LOG_EXCLUDED = {"/metrics", "/api/health"}
 
+# 进程启动时间（uptime 指标基准）
+_PROCESS_START = time.time()
+
 
 class ObservabilityMiddleware(BaseHTTPMiddleware):
     """RequestID 注入 + 请求指标 + 访问日志"""
@@ -34,6 +37,8 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         method = request.method
         path = request.url.path
+
+        metrics.set_gauge("process_uptime_seconds", time.time() - _PROCESS_START)
 
         try:
             response = await call_next(request)

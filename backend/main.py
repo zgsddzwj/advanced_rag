@@ -74,7 +74,15 @@ async def lifespan(app: FastAPI):
     close_mongo()
 
 
-app = FastAPI(title="NexusRAG", lifespan=lifespan)
+app = FastAPI(
+    title="NexusRAG",
+    version="1.0.0",
+    description=(
+        "基于 LangGraph 编排的企业级 RAG 智能知识检索引擎："
+        "双流水线导入/检索、Dense+BM25+HyDE 混合检索、事件驱动同步、全链路可观测。"
+    ),
+    lifespan=lifespan,
+)
 
 # 统一异常处理：业务异常 / 校验异常 / 未捕获异常 → 统一响应信封
 register_error_handlers(app)

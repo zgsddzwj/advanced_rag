@@ -102,6 +102,8 @@ class TestObservabilityMiddleware:
         resp = client.get("/metrics")
         assert resp.status_code == 200
         assert "http_requests_total" in resp.text
+        # 进程 uptime gauge 随请求上报
+        assert "process_uptime_seconds" in resp.text
 
 
 class TestRequestContext:
