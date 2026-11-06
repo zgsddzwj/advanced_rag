@@ -118,7 +118,26 @@ Mongo 在模块导入期同步建连（基础设施未就绪时最长阻塞 30s�
 横切面：settings（演进1）· 异常/信封（演进2）· metrics/health/中间件（演进5）· cache（演进8）
 ```
 
+## 前端深度优化（7 轮）
+
+在演进与两轮工程优化之后，前端按「好看 + 生产级」目标完成了 7 轮重构
+（`a1c69dd` → `5ea3ff8`），每一轮独立提交、独立可回滚：
+
+| # | 主题 | 核心交付 |
+|---|------|---------|
+| 1 | 设计系统 + 暗色模式 | Tailwind class 策略暗色、ThemeProvider（持久化 + 跟随系统 + FOUC 防闪烁）、CSS 设计令牌、路由级代码分割 |
+| 2 | 全局反馈体系 | Toast 通知（替换 alert）、路由级 ErrorBoundary（单页崩溃不拖垮外壳） |
+| 3 | Layout 响应式 | 移动端抽屉侧边栏（遮罩/Esc 关闭）、SidebarContent 复用 |
+| 4 | Markdown 渲染 | CodeBlock（语言标签 + 复制，hast 提取保高亮）、外链 noopener、图片 Lightbox、回答复制全文 |
+| 5 | 对话体验 | 回到底部按钮、ChatPage/思考气泡全暗色 |
+| 6 | DocumentsPage | 骨架屏、列表/切片双搜索、空状态引导、错误重试 |
+| 7 | Dashboard | 真实健康探活卡（/api/health 数据可视化，30s 轮询 + 手动刷新） |
+
+配套的小改进：暗色 FOUC 防闪烁、SVG favicon、404 兜底路由、
+上传大小前端预校验、切片一键复制、`process_uptime_seconds` 指标、
+FastAPI 元数据补全。
+
 ## 验证
 
-- pytest 单测 104 个（`cd backend && uv run pytest tests/ -q`），全部不依赖真实基础设施
-- 前端 `npm run build` 通过；API 路径、SSE 协议、环境变量契约全部保持兼容
+- pytest 单测 154+ 个（`cd backend && uv run pytest tests/ -q`），全部不依赖真实基础设施
+- 前端 `npm run build` 零错误通过（tsc 类型检查含内）；API 路径、SSE 协议、环境变量契约全部保持兼容
