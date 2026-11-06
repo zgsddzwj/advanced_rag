@@ -6,6 +6,20 @@
   <title>NexusRAG — 智能知识检索引擎</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    // 首屏防闪烁（FOUC）：在 React 挂载前应用持久化主题
+    // 键名与 ThemeProvider 的 STORAGE_KEY 保持一致
+    ;(function () {
+      try {
+        var t = localStorage.getItem('nexusrag-theme')
+        if (t !== 'light' && t !== 'dark') {
+          t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+        }
+        if (t === 'dark') document.documentElement.classList.add('dark')
+        document.documentElement.style.colorScheme = t
+      } catch (e) {}
+    })()
+  </script>
 </head>
 <body>
   <div id="root"></div>
