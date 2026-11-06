@@ -2,10 +2,32 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   FileText, ChevronLeft, Hash, Tag, Layers, RefreshCw, Loader2, FileStack,
-  AlertCircle, Search, ArrowRight, RotateCcw,
+  AlertCircle, Search, ArrowRight, RotateCcw, Copy, Check,
 } from 'lucide-react'
 import { getDocumentList, getDocumentChunks } from '@/api/client'
 import type { DocumentItem, ChunkItem } from '@/types'
+import { copyText } from '@/components/CodeBlock'
+
+/** 切片内容复制按钮 */
+function CopyChunkButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    if (await copyText(text)) {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      aria-label="复制切片内容"
+      title="复制切片内容"
+      className="p-1.5 rounded-md text-gray-300 dark:text-slate-600 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors"
+    >
+      {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+    </button>
+  )
+}
 
 /* 列表骨架屏 */
 function ListSkeleton() {
@@ -220,6 +242,7 @@ export default function DocumentsPage() {
                       <span className="text-xs text-gray-400 dark:text-slate-500 px-2 py-0.5 bg-gray-100 dark:bg-slate-800 rounded">
                         Part {chunk.part}
                       </span>
+                      <CopyChunkButton text={chunk.content} />
                     </div>
                     {/* 切片内容 */}
                     <div className="px-5 py-4">
