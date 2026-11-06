@@ -41,6 +41,11 @@ export default function ImportPage() {
       toast.error('仅支持 PDF 或 Markdown 文件')
       return
     }
+    // 与后端 MAX_FILE_SIZE 一致的预校验：超大文件本地即拒，节省上传带宽
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error(`文件大小 ${(file.size / 1024 / 1024).toFixed(0)}MB 超过 100MB 上限`)
+      return
+    }
     setSelectedFile(file)
     setResultBanner(null)
   }, [toast])
