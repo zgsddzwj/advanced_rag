@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Upload, MessageSquare, Cpu, FileStack, Search, Layers, Bot, Zap,
-  Database, Server, HardDrive, Radio, RefreshCw, Loader2,
+  Database, Server, HardDrive, Radio, RefreshCw, Loader2, Github,
 } from 'lucide-react'
 import { getSystemHealth } from '@/api/client'
 import type { SystemHealth } from '@/types'
@@ -133,6 +133,14 @@ export default function Dashboard() {
         <div className="relative z-10">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">📚 NexusRAG — 智能知识检索引擎</h1>
           <p className="text-white/80 text-sm md:text-base">基于 LangGraph 编排 · 混合检索 (Dense + BM25) · 阿里云百炼 AI 全链路接入</p>
+          <a
+            href="https://github.com/zgsddzwj/advanced_rag"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-5 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/25 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Github size={16} /> GitHub 仓库
+          </a>
         </div>
         <div className="absolute -top-20 -right-10 w-80 h-80 bg-white/10 rounded-full" />
         <div className="absolute -bottom-16 right-32 w-48 h-48 bg-white/5 rounded-full" />
