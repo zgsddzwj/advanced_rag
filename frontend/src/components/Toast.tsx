@@ -51,16 +51,30 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const scheduleDismiss = useCallback((id: number, type: ToastType) => {
+    const duration = type === 'error' ? ERROR_DURATION_MS : DEFAULT_DURATION_MS
+    timersRef.current.set(id, setTimeout(() => dismiss(id), duration))
+  }, [dismiss])
+
+  // 悬停暂停自动关闭：阅读长错误消息时不再被定时清掉
+  const pause = useCallback((id: number) => {
+    const timer = timersRef.current.get(id)
+    if (timer) {
+      clearTimeout(timer)
+      timersRef.current.delete(id)
+    }
+  }, [])
+
+  const resume = useCallback((id: number, type: ToastType) => {
+    scheduleDismiss(id, type)
+  }, [scheduleDismiss])
+
   const push = useCallback((type: ToastType, message: string) => {
     const id = ++idRef.current
     // 同屏最多保留 MAX_VISIBLE 条，新的挤掉最旧的
     setToasts(prev => [...prev.slice(-(MAX_VISIBLE - 1)), { id, type, message }])
-    const duration = type === 'error' ? ERROR_DURATION_MS : DEFAULT_DURATION_MS
-    timersRef.current.set(
-      id,
-      setTimeout(() => dismiss(id), duration),
-    )
-  }, [dismiss])
+    scheduleDismiss(id, type)
+  }, [scheduleDismiss])
 
   const value = useMemo<ToastContextValue>(
     () => ({
@@ -88,6 +102,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
           return (
             <div
               key={t.id}
+              onMouseEnter={() => pause(t.id)}
+              onMouseLeave={() => resume(t.id, t.type)}
               className="toast-enter surface rounded-xl shadow-lg px-4 py-3 flex items-start gap-3"
             >
               <Icon size={19} className={`${ICON_COLORS[t.type]} flex-shrink-0 mt-0.5`} />
