@@ -1,5 +1,14 @@
 # NexusRAG — 智能知识检索引擎
 
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
+![LangGraph](https://img.shields.io/badge/LangGraph-orchestration-8B5CF6)
+![Milvus](https://img.shields.io/badge/Milvus-2.5-00A1E0?logo=milvus&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-154+-22C55E)
+![License](https://img.shields.io/badge/License-MIT-22C55E)
+
 > 基于 LangGraph 编排的企业级 RAG 系统，支持 PDF/MD 智能导入、Dense+BM25 混合检索、HyDE 增强、RRF 融合与 Rerank 精排，提供流式问答体验。
 
 ## 项目简介
