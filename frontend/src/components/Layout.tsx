@@ -107,6 +107,11 @@ export default function Layout() {
 
   const pageTitle = navItems.find(n => n.to === location.pathname)?.label || 'NexusRAG'
 
+  // 浏览器标签页标题跟随当前页面
+  useEffect(() => {
+    document.title = `${pageTitle} · NexusRAG`
+  }, [pageTitle])
+
   return (
     <div className="flex h-screen overflow-hidden">
       {/* 桌面侧边栏（md 及以上常驻） */}
