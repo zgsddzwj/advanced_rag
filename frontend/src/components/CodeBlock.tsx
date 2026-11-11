@@ -52,10 +52,15 @@ export default function CodeBlock({ language, rawText, children }: CodeBlockProp
     }
   }
 
+  const lineCount = rawText ? rawText.replace(/\n$/, '').split('\n').length : 0
+
   return (
     <div className="code-block my-3 rounded-lg overflow-hidden border border-slate-700/50 bg-[#1e1e2e]">
       <div className="flex items-center justify-between px-4 py-1.5 bg-slate-800/60 border-b border-slate-700/40">
-        <span className="text-xs text-slate-400 font-mono lowercase">{language}</span>
+        <span className="text-xs text-slate-400 font-mono lowercase">
+          {language}
+          {lineCount > 0 && <span className="text-slate-600"> · {lineCount} 行</span>}
+        </span>
         <button
           onClick={handleCopy}
           aria-label="复制代码"
