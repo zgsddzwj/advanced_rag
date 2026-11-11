@@ -131,6 +131,10 @@ body {
 }
 .drawer-enter { animation: drawer-in 0.25s ease-out; }
 
+/* ==================== 文本选中高亮 ==================== */
+::selection { background: rgba(99, 102, 241, 0.25); }
+.dark ::selection { background: rgba(129, 140, 248, 0.4); }
+
 /* ==================== 滚动条 ==================== */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
