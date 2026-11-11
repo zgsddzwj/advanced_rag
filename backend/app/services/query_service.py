@@ -81,7 +81,8 @@ class QueryService:
     # ---------- 对话历史 ----------
 
     def get_history(self, session_id: str, limit: int = 20) -> list:
-        """获取会话最近对话（裁剪为前端所需字段）"""
+        """获取会话最近对话（裁剪为前端所需字段）；limit 钳制到 [1, 100]"""
+        limit = max(1, min(limit, 100))
         messages = self.history_repo.get_recent(session_id, limit=limit)
         return [
             {
