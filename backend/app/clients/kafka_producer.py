@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 from app.core.logger import logger
 from app.conf.settings import settings
-from app.events.model import build_event
+from app.events.model import DocumentEvent, build_event
 
 # 延迟导入 aiokafka，避免未安装时启动崩溃
 _producer = None
@@ -91,7 +91,7 @@ async def publish_document_event(
     return await send_event(event, topic=settings.kafka_topic)
 
 
-async def send_event(event, topic: str) -> bool:
+async def send_event(event: DocumentEvent, topic: str) -> bool:
     """发送 DocumentEvent 到指定 topic（主 topic / 死信共用）"""
     try:
         producer = await _get_producer()
@@ -115,13 +115,11 @@ async def send_event(event, topic: str) -> bool:
         return False
 
 
-async def publish_to_dlq(event, error: str, attempts: int) -> bool:
+async def publish_to_dlq(event: DocumentEvent, error: str, attempts: int) -> bool:
     """
     重试耗尽的事件转入死信队列，附失败上下文供人工排查/重放
     死信发布失败仅记录日志（主流程已结束，不阻塞消费循环）
     """
-    from app.events.model import DocumentEvent  # noqa: F401 — 类型提示用
-
     dlq_payload = event.model_dump()
     dlq_payload["dlq"] = {
         "error": error[:2000],
