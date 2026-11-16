@@ -22,6 +22,8 @@ from app.conf.settings import settings
 CHECK_TIMEOUT_SECONDS = 5
 # 探活结果缓存时长（秒）
 HEALTH_CACHE_TTL_SECONDS = 10
+# 进程启动时间（uptime 上报基准；模块首次导入即进程启动初期）
+_PROCESS_START = time.time()
 
 _executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="healthcheck")
 
@@ -133,4 +135,5 @@ def _probe_all() -> Dict:
         "status": "ok" if all_ok else "degraded",
         "checks": results,
         "caches": cache_all_stats(),
+        "uptime_seconds": round(time.time() - _PROCESS_START),
     }

@@ -68,6 +68,15 @@ class TestHealthCache:
         assert calls["n"] == 2
         assert result["cached"] is False
 
+    def test_payload_contains_uptime(self, monkeypatch):
+        """探活结果附进程存活时长，便于外部判断最近一次重启"""
+        monkeypatch.setattr(health, "_probe_all", lambda: {"status": "ok", "checks": {}, "caches": {}})
+        health._health_cache["data"] = None
+
+        result = health.collect_health()
+        assert isinstance(result.get("uptime_seconds"), int)
+        assert result["uptime_seconds"] >= 0
+
     def test_cached_result_not_mutated_by_caller(self):
         """返回的副本带 cached 标记，缓存本体不受污染"""
         health._health_cache["data"] = {"status": "ok", "checks": {}, "caches": {}}
