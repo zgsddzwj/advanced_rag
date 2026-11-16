@@ -134,8 +134,8 @@ function MessageBubble({ msg, streaming }: { msg: ChatMessage; streaming?: boole
           </div>
         )}
 
-        {/* 复制全文（悬停显现） */}
-        {!isUser && !streaming && msg.text && <CopyMessageButton text={msg.text} />}
+        {/* 复制全文（悬停显现；流式输出中的临时气泡不显示） */}
+        {!streaming && msg.text && <CopyMessageButton text={msg.text} />}
 
         {/* 图片放大预览 */}
         {preview && (
