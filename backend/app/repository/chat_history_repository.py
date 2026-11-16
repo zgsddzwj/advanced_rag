@@ -63,7 +63,8 @@ class ChatHistoryRepository:
         return str(result.inserted_id)
 
     def get_recent(self, session_id: str, limit: int = 10) -> List[Dict[str, Any]]:
-        """查询指定会话最近 N 条记录，按时间正序返回"""
+        """查询指定会话最近 N 条记录，按时间正序返回；limit 钳制到 [1, 100]"""
+        limit = max(1, min(int(limit), 100))
         try:
             cursor = (
                 self.collection.find({"session_id": session_id})
