@@ -4,7 +4,6 @@ RRF 融合节点（节点5）
 融合参数（k / 输出上限）支持按请求配置（演进7）
 """
 import sys
-import hashlib
 from typing import List, Dict, Any
 
 from app.query_process.agent.state import QueryGraphState
@@ -108,10 +107,10 @@ def _accumulate_scores(
 
 
 def _get_chunk_key(chunk: Dict[str, Any]) -> str:
-    """获取 chunk 的唯一标识，用于去重（使用 hashlib 保证跨进程确定性）"""
+    """获取 chunk 的唯一标识，用于去重"""
     chunk_id = chunk.get("chunk_id", "")
     if chunk_id:
         return str(chunk_id)
-    # 无 chunk_id 则用 content 前缀的 md5 摘要
+    # 无 chunk_id 则用 content 前缀直接作为键（去重用途，无需加密哈希）
     content = chunk.get("content", "")[:200]
-    return f"content_{hashlib.md5(content.encode('utf-8')).hexdigest()}"
+    return f"content_{content}"
