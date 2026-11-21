@@ -44,11 +44,18 @@ def rerank_documents(
         return documents[:top_n]
 
     scored_docs = []
-    for item in result.output.results:
+    results = getattr(getattr(result, "output", None), "results", None) or []
+    for item in results:
         idx = item["index"]
+        if idx < 0 or idx >= len(documents):
+            continue
         doc = documents[idx].copy()
         doc["score"] = item["relevance_score"]
         scored_docs.append(doc)
 
-    logger.info(f"Rerank 完成: {len(scored_docs)} 条文档，Top1 得分: {scored_docs[0]['score']:.4f}" if scored_docs else "Rerank 完成: 无结果")
+    if scored_docs:
+        logger.info(f"Rerank 完成: {len(scored_docs)} 条文档，Top1 得分: {scored_docs[0]['score']:.4f}")
+    else:
+        logger.warning("Rerank 完成: 无有效结果，回退原始排序")
+        return documents[:top_n]
     return scored_docs
