@@ -71,7 +71,10 @@ class DocumentMetaRepository:
     def get(self, file_title: str) -> Optional[Dict[str, Any]]:
         """查询文档元数据"""
         try:
-            return self.collection.find_one({"file_title": file_title})
+            doc = self.collection.find_one({"file_title": file_title})
+            if doc and "_id" in doc:
+                doc["_id"] = str(doc["_id"])
+            return doc
         except Exception as e:
             logger.error(f"查询文档元数据失败: {e}")
             return None
