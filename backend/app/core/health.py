@@ -114,14 +114,18 @@ def _probe_all() -> Dict:
             "elapsed_ms": round((time.perf_counter() - start) * 1000, 1),
         }
 
+    futures = {_executor.submit(run, name, fn): name for name, fn in _CHECKS.items()}
     results = {}
-    futures = [_executor.submit(run, name, fn) for name, fn in _CHECKS.items()]
-    for future in futures:
+    for future, check_name in futures.items():
         try:
             name, result = future.result(timeout=CHECK_TIMEOUT_SECONDS)
             results[name] = result
         except Exception:
-            results["<timeout>"] = {"ok": False, "detail": "health check timeout", "elapsed_ms": CHECK_TIMEOUT_SECONDS * 1000}
+            results[check_name] = {
+                "ok": False,
+                "detail": "health check timeout",
+                "elapsed_ms": CHECK_TIMEOUT_SECONDS * 1000,
+            }
 
     all_ok = all(c["ok"] for c in results.values())
     if not all_ok:
