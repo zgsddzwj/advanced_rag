@@ -33,7 +33,12 @@ def web_search(query: str, count: int = 5) -> List[Dict[str, Any]]:
 
     # 解析搜索结果，统一格式
     docs = []
-    output_text = result.output.choices[0].message.content if hasattr(result.output, 'choices') else str(result.output)
+    output = getattr(result, "output", None)
+    if output is None:
+        logger.warning(f"百炼 MCP 搜索返回空 output: {getattr(result, 'message', 'unknown')}")
+        return []
+
+    output_text = output.choices[0].message.content if hasattr(output, 'choices') else str(output)
 
     # 如果返回的是结构化数据，按结构解析；否则包装为单个文档
     if isinstance(output_text, list):
