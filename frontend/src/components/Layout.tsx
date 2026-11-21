@@ -81,13 +81,14 @@ export default function Layout() {
 
   // 定期健康检查（每 30 秒）：聚合端点探测全部下游依赖
   useEffect(() => {
+    let cancelled = false
     const check = () =>
       getSystemHealth()
-        .then(r => setHealth(r.status === 'degraded' ? 'degraded' : 'ok'))
-        .catch(() => setHealth('offline'))
+        .then(r => { if (!cancelled) setHealth(r.status === 'degraded' ? 'degraded' : 'ok') })
+        .catch(() => { if (!cancelled) setHealth('offline') })
     check()
     const timer = setInterval(check, 30000)
-    return () => clearInterval(timer)
+    return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
   // 路由变化时收起移动端抽屉
