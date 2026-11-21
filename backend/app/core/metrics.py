@@ -118,9 +118,10 @@ def render_prometheus() -> str:
         for suffix, value in (("_sum", total), ("_count", count), ("_max", max_v)):
             lines.append(f"{name}{suffix}{emit(labels, value)}")
 
-    for name, value in gauges.items():
+    for key, value in gauges.items():
+        name, labels = _split_key(key)
         _emit_help(lines, name, "gauge")
-        lines.append(f"{name}{emit('', value)}")
+        lines.append(f"{name}{emit(labels, value)}")
 
     return "\n".join(lines) + "\n"
 
