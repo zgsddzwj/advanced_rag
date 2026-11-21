@@ -50,7 +50,9 @@ def create_sse_queue(session_id: str, loop: Optional[asyncio.AbstractEventLoop] 
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
-            loop = asyncio.get_event_loop()
+            # 无运行中事件循环时创建新循环（Python 3.12+ get_event_loop 已弃用）
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
     _sse_queues[session_id] = asyncio.Queue()
     _sse_loops[session_id] = loop
