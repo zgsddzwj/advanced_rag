@@ -167,6 +167,9 @@ class ImportService:
         except Exception as e:
             logger.error(f"导入流程失败，task_id: {task_id}，错误: {str(e)}", exc_info=True)
             update_task_status(task_id, TASK_STATUS_FAILED)
+        finally:
+            # 清理上传的临时文件，避免磁盘空间累积
+            _cleanup_upload_file(file_path)
 
 
 def _publish_import_event(
@@ -192,3 +195,15 @@ def _publish_import_event(
             chunk_count=chunk_count,
             item_name=item_name,
         ))
+
+
+def _cleanup_upload_file(file_path: str) -> None:
+    """导入完成后清理上传的临时文件，释放磁盘空间"""
+    try:
+        from pathlib import Path
+        p = Path(file_path)
+        if p.exists() and UPLOAD_DIR in p.parents:
+            p.unlink(missing_ok=True)
+            logger.info(f"已清理上传临时文件: {file_path}")
+    except Exception as e:
+        logger.warning(f"清理上传临时文件失败: {file_path}, {e}")
