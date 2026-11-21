@@ -24,8 +24,8 @@ class EventDedupRepository:
             self._collection = get_mongo_db()[EVENT_DEDUP_COLLECTION]
         if not self._index_ready:
             try:
-                # event_id 是幂等去重查找的定位键（此前仅有 TTL 索引，去重查询走全表扫描）
-                self._collection.create_index("event_id")
+                # event_id 唯一索引：幂等去重定位键，唯一约束由数据库层兜底防并发竞态
+                self._collection.create_index("event_id", unique=True)
                 # TTL 索引：processed_at 超过 ttl_days 的记录自动清理
                 self._collection.create_index(
                     "processed_at",
