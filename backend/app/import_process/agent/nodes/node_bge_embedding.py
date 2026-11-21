@@ -36,6 +36,7 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
         all_vectors = []
         total_batches = (len(texts) + BATCH_SIZE - 1) // BATCH_SIZE
         failed_batches = 0
+        failed_count = 0
         # 记录每个 chunk 的向量是否有效
         valid_flags = []
 
@@ -54,6 +55,7 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
                 all_vectors.extend([None] * len(batch))
                 valid_flags.extend([False] * len(batch))
                 failed_batches += 1
+                failed_count += len(batch)
 
         if failed_batches > 0:
             logger.warning(f"向量化完成（含 {failed_batches}/{total_batches} 个失败批次跳过）")
@@ -69,7 +71,7 @@ def node_bge_embedding(state: ImportGraphState) -> ImportGraphState:
 
         state["chunks"] = valid_chunks
         state["embeddings_content"] = [v for v in all_vectors if v is not None]
-        logger.info(f"向量化完成，有效向量 {len(state['embeddings_content'])} 个，跳过 {failed_batches * BATCH_SIZE} 条")
+        logger.info(f"向量化完成，有效向量 {len(state['embeddings_content'])} 个，跳过 {failed_count} 条")
 
     except Exception as e:
         logger.error(f"向量化失败: {str(e)}", exc_info=True)
