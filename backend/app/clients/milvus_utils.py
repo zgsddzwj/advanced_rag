@@ -3,6 +3,7 @@ Milvus 客户端工具
 负责连接管理、集合创建（含 BM25）、混合搜索
 """
 from typing import List, Dict, Any, Optional
+import threading
 from pymilvus import (
     MilvusClient, DataType, Function, FunctionType,
     AnnSearchRequest, RRFRanker
@@ -11,22 +12,28 @@ from app.core.logger import logger
 from app.conf.settings import settings
 
 _milvus_client: Optional[MilvusClient] = None
+_milvus_client_lock = threading.Lock()
 # 已加载集合缓存，避免重复调用 load_collection
 _loaded_collections: set = set()
+_loaded_collections_lock = threading.Lock()
 
 
 def get_milvus_client() -> MilvusClient:
     """获取 Milvus 客户端单例"""
     global _milvus_client
     if _milvus_client is None:
-        _milvus_client = MilvusClient(uri=settings.milvus_url)
-        logger.info(f"Milvus 客户端连接成功: {settings.milvus_url}")
+        with _milvus_client_lock:
+            if _milvus_client is None:
+                _milvus_client = MilvusClient(uri=settings.milvus_url)
+                logger.info(f"Milvus 客户端连接成功: {settings.milvus_url}")
     return _milvus_client
 
 
 def ensure_collection_loaded(client: MilvusClient, collection_name: str):
     """确保集合已加载到内存（幂等，跳过已加载的集合）"""
-    if collection_name not in _loaded_collections:
+    with _loaded_collections_lock:
+        if collection_name in _loaded_collections:
+            return
         client.load_collection(collection_name=collection_name)
         _loaded_collections.add(collection_name)
         logger.info(f"Milvus 集合已加载: {collection_name}")
